@@ -31,7 +31,9 @@ def test_env(tmp_path, monkeypatch):
     corpus_dir.mkdir(parents=True, exist_ok=True)
     corpus_file = corpus_dir / "corpus.jsonl"
     corpus_file.write_text(
-        '{"id": "1", "title": "Sentencia de resolucion", "text": "La resolucion del tribunal..."}\n',
+        '{"id": "1", "title": "Documento de resolucion", "text": "La resolucion del proceso..."}\n'
+        '{"id": "2", "title": "Documento informativo", "text": "Contenido general sin coincidencias."}\n'
+        '{"id": "3", "title": "Manual interno", "text": "Texto adicional para estabilizar BM25."}\n',
         encoding="utf-8",
     )
     monkeypatch.setattr(settings, "CORPUS_PATH", str(corpus_dir))
@@ -43,12 +45,12 @@ def test_env(tmp_path, monkeypatch):
     # Build a minimal UserData and stub accessible spaces for endpoints
     import uuid as _uuid
     user = auth.UserData(user_id=str(_uuid.uuid4()), username="alice", spaces=["personal"], first_name="Alice", last_name="Test")
-    monkeypatch.setattr(search_ep, "get_accessible_spaces", lambda u: ["supreme_court", "alice/personal"])
-    monkeypatch.setattr(files_ep, "get_accessible_spaces", lambda u: ["supreme_court", "alice/personal"])
+    monkeypatch.setattr(search_ep, "get_accessible_spaces", lambda u: [settings.DEFAULT_SPACE, "alice/personal"])
+    monkeypatch.setattr(files_ep, "get_accessible_spaces", lambda u: [settings.DEFAULT_SPACE, "alice/personal"])
 
-    # Index the built-in supreme court corpus and a simple personal document
+    # Index the built-in default corpus and a simple personal document
     # For OpenSearch backend, this will create/refresh the alias for the space.
-    search_engine.index("supreme_court")
+    search_engine.index(settings.DEFAULT_SPACE)
 
     # Create a simple document in alice's personal space
     uploads_dir = Path(settings.DATA_UPLOAD) / "alice" / "personal"
@@ -94,7 +96,7 @@ def fake_openai(monkeypatch):
 
 def test_search_basic(test_env):
     user = test_env
-    resp = search_ep.search(q="resolucion", top_k=3, space="supreme_court", user=user)
+    resp = search_ep.search(q="resolucion", top_k=3, space=settings.DEFAULT_SPACE, user=user)
     assert resp.results
     hit = resp.results[0]
     assert hit.score > 0

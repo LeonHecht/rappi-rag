@@ -76,7 +76,7 @@ export default function Search() {
 
   return (
     <div className="w-full flex-1 overflow-y-auto min-h-0 space-y-4 px-16 py-8">
-      <h2 className="text-2xl font-semibold mb-4">Buscar casos</h2>
+      <h2 className="text-2xl font-semibold mb-4">Buscar documentos</h2>
 
       <div className="flex items-center mb-6 space-x-4">
         <SpaceSelect
@@ -91,7 +91,7 @@ export default function Search() {
             className="flex-grow w-full py-3 px-4 border rounded-2xl
                               focus:outline-none focus:placeholder-transparent
                               hover:bg-gray-50 transition-colors"
-            placeholder="Ingresa las palabras de tu búsqueda..."
+            placeholder="Ingresa las palabras de tu busqueda..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onSearch()}
@@ -149,7 +149,7 @@ export default function Search() {
                       rel="noreferrer"
                       className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-100"
                       >
-                      Download Full Case
+                      Descargar documento completo
                     </a>
                   )}
                   <div className="absolute bottom-2 right-2 flex space-x-2">

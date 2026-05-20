@@ -234,7 +234,7 @@ class OpenSearchSearch:
     def _load_documents(self, space: str) -> list[dict[str, Any]]:
         documents: list[dict[str, Any]] = []
 
-        if space == "supreme_court":
+        if space == settings.DEFAULT_SPACE:
             # Try S3 first if configured
             if getattr(settings, "S3_BUCKET", None) and getattr(settings, "S3_CORPUS_KEY", None) and boto3 is not None:
                 try:
@@ -362,7 +362,8 @@ class OpenSearchSearch:
     # ------------------------------------------------------------------
     # Public API (mirrors BM25Search)
     # ------------------------------------------------------------------
-    def index(self, space: str = "supreme_court") -> None:
+    def index(self, space: str | None = None) -> None:
+        space = space or settings.DEFAULT_SPACE
         if not self._is_serverless():
             self._wait_for_cluster()
         
@@ -424,7 +425,8 @@ class OpenSearchSearch:
         except Exception:
             return False
 
-    def search(self, query: str, top_k: int = 30, space: str = "supreme_court") -> list[dict[str, Any]]:
+    def search(self, query: str, top_k: int = 30, space: str | None = None) -> list[dict[str, Any]]:
+        space = space or settings.DEFAULT_SPACE
         client = self._get_client()
         alias = self._alias_name(space)
         target_index = alias

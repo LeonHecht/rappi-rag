@@ -23,7 +23,7 @@ same code path is still used by the test suite.
    OPENSEARCH_PASSWORD=your-password
    # optional, but recommended when using HTTPS
    OPENSEARCH_CA_CERT=/path/to/ca.pem
-   OPENSEARCH_INDEX_PREFIX=encuentra
+   OPENSEARCH_INDEX_PREFIX=rag-template
    ```
 3. **Start the API**. On startup the FastAPI app will synchronise the
    filesystem corpus with OpenSearch by re-creating per-space indexes and
@@ -53,7 +53,7 @@ You can run staging/prod on AWS OpenSearch Serverless using IAM role auth from A
    # Use your collection endpoint hostname
    OPENSEARCH_HOSTS=https://<collection-id>.<region>.aoss.amazonaws.com
    OPENSEARCH_VERIFY_CERTS=true
-   OPENSEARCH_INDEX_PREFIX=encuentra-stg
+   OPENSEARCH_INDEX_PREFIX=rag-template-stg
    ```
 
 2. App Runner IAM role: attach a task role with permissions allowed by your AOSS data access policy (least-privilege). Typical actions include read/search and indexing on specific collections and indexes. Credentials are sourced automatically by boto3 in App Runner.
@@ -91,17 +91,17 @@ Example contents for staging/prod when using S3 + OpenSearch:
 SEARCH_BACKEND=opensearch
 
 # S3 corpus and files
-S3_BUCKET=encuentra-data
+S3_BUCKET=rag-template-data
 S3_CORPUS_KEY=staging/corpus.jsonl   # or prod/corpus.jsonl
 S3_FILES_PREFIX=staging/files/       # or prod/files/
 S3_URL_TTL=604800                    # 7 days for presigned URLs
 
 # OpenSearch cluster
 OPENSEARCH_HOSTS=https://<EC2-private-ip>:9200
-OPENSEARCH_USERNAME=encu_app
+OPENSEARCH_USERNAME=rag_app
 OPENSEARCH_PASSWORD=AppUserPwd_!234
 OPENSEARCH_VERIFY_CERTS=false
-# OPENSEARCH_INDEX_PREFIX=encuentra-stg  # optional: avoid collisions if sharing a cluster
+# OPENSEARCH_INDEX_PREFIX=rag-template-stg  # optional: avoid collisions if sharing a cluster
 ```
 
 For local development, keep your current setup (e.g. OpenSearch in Docker):

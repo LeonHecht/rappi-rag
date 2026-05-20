@@ -5,13 +5,11 @@ import { useAuth } from '../context/AuthContext';
 export default function Landing() {
   const { session } = useAuth();
   const user = session?.user;
-  // Try full_name first, then first_name, or extract first name from full_name
   const fullName = user?.user_metadata?.full_name;
   const firstName = user?.user_metadata?.first_name || fullName?.split(' ')[0];
 
   return (
     <div className="h-screen flex flex-col items-center justify-center text-gray-900">
-      {/* Animated headline (starts centred & large; settles smaller & higher) */}
       <div
         // initial={{ y: +30, scale: 1.6 }}
         // animate={{ y: -10, scale: 1 }}
@@ -19,12 +17,10 @@ export default function Landing() {
         className="flex items-end"
       >
         <h1 className="text-6xl md:text-6xl font-semibold tracking-tight">
-          {user && firstName ? `Hola, ${firstName}` : 'encuentra'}
+          {user && firstName ? `Hola, ${firstName}` : 'Agentic RAG Template'}
         </h1>
-        {/* <img src={logo} alt="Encuentra logo" className="w-64" /> */}
       </div>
 
-      {/* Subtitle + buttons fade / slide in once headline settles */}
       <div
         // initial={{ opacity: 0, y: 20 }}
         // animate={{ opacity: 1, y: 0 }}
@@ -32,7 +28,7 @@ export default function Landing() {
         className="flex flex-col items-center mt-6 space-y-10"
       >
         <p className="text-xl md:text-2xl font-light text-center">
-          Búsqueda legal inteligente & conversa con jurisprudencia
+          Busca documentos, conversa con tu base de conocimiento y sube archivos en un solo lugar
         </p>
 
         <div className="flex gap-4">

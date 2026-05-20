@@ -567,7 +567,7 @@ export default function Chat() {
                     ref={textareaRef}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder="Pregunta lo que quieras a tu asistente legal…"
+                    placeholder="Pregunta lo que quieras a tu asistente RAG..."
                   />
                 </PromptInputBody>
                 <PromptInputFooter>

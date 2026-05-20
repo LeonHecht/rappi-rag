@@ -4,6 +4,7 @@ from ..schemas import SearchResponse, SearchResult
 from backend.app.services.search import search_engine
 from backend.app.dependencies import get_current_user
 from backend.app.services.auth import get_accessible_spaces, UserData
+from backend.app.core.config import settings
 
 
 router = APIRouter()
@@ -17,7 +18,7 @@ def list_spaces(user: UserData = Depends(get_current_user)):
 def search(
     q: str = Query(..., min_length=1),
     top_k: int = Query(10, ge=1, le=50),
-    space: str = Query(..., min_length=1, description="Contexto: supreme_court|my_uploads|<other>"),
+    space: str = Query(..., min_length=1, description=f"Contexto: {settings.DEFAULT_SPACE}|my_uploads|<other>"),
     user: UserData = Depends(get_current_user),
 ):
     print(f"Received search query: '{q}' in space '{space}' with top_k={top_k}")

@@ -26,7 +26,7 @@ def get_supabase() -> Client:
     return _supabase_client
 
 
-PUBLIC_SPACES = ["supreme_court"]
+PUBLIC_SPACES = [settings.DEFAULT_SPACE]
 
 @dataclass
 class UserData:
@@ -125,7 +125,7 @@ def get_accessible_spaces(user: UserData) -> List[str]:
     """Return a list of space identifiers the user can access.
 
     Format matches existing frontend expectations:
-        - Public spaces: "supreme_court" (no slash)
+        - Public spaces: settings.DEFAULT_SPACE (no slash)
         - Personal spaces: "<email>/<space_name>"
         - Org spaces: "<org_id>/<space_name>" (can later be swapped to org name)
     """

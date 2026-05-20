@@ -13,7 +13,7 @@ from .api.v1.endpoints import billing
 
 
 app = FastAPI(
-    title="Encuentra API",
+    title=f"{settings.APP_NAME} API",
     version=settings.API_VERSION,
 )
 
@@ -66,8 +66,8 @@ def on_startup():
         return True
 
     # Main corpus space
-    if needs_index("supreme_court"):
-        search_engine.index(space="supreme_court")
+    if needs_index(settings.DEFAULT_SPACE):
+        search_engine.index(space=settings.DEFAULT_SPACE)
 
     # User upload spaces
     uploads_root = Path(settings.DATA_UPLOAD)

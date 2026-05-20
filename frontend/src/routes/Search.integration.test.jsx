@@ -23,7 +23,7 @@ const apiMock = vi.fn(async (path, qs = '') => {
     if (q === 'derecho') {
       return {
         results: [
-          { id: 'doc-1', title: 'Sentencia 123/2020', score: 0.87, snippet: 'derecho constitucional' },
+          { id: 'doc-1', title: 'Document 123', score: 0.87, snippet: 'alpha policy' },
         ],
       }
     }
@@ -42,7 +42,7 @@ describe('<Search />', () => {
     render(<Search />)
 
     // waits for spaces load + heading
-    await waitFor(() => expect(screen.getByText(/Buscar casos/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/Buscar documentos/i)).toBeInTheDocument())
     expect(apiMock).toHaveBeenCalledWith('user/spaces')
 
     const btn = screen.getByRole('button', { name: /buscar/i })
@@ -55,20 +55,20 @@ describe('<Search />', () => {
 
   it('runs a real search and renders a result', async () => {
     render(<Search />)
-    await screen.findByText(/Buscar casos/)
+    await screen.findByText(/Buscar documentos/)
 
     const input = screen.getByPlaceholderText(/Ingresa las palabras/i)
     const btn   = screen.getByRole('button', { name: /buscar/i })
 
     await userEvent.type(input, 'derecho')
     await userEvent.click(btn)
-    await screen.findByText(/Sentencia 123\/2020/)
+    await screen.findByText(/Document 123/)
     expect(screen.getByText(/Score:/)).toBeInTheDocument()
   })
 
   it('shows empty state when query has zero hits', async () => {
     render(<Search />)
-    await screen.findByText(/Buscar casos/)
+    await screen.findByText(/Buscar documentos/)
 
     const input = screen.getByPlaceholderText(/Ingresa las palabras/i)
     const btn   = screen.getByRole('button', { name: /buscar/i })

@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 /**
  * Llama al endpoint de la API en /v1/{path}{params}
  * @param {string} path   Ruta tras /v1/, p.ej. "search" o "chat"
- * @param {string} params Query string, p.ej. "?q=delito&space=supreme_court"
+ * @param {string} params Query string, e.g. "?q=policy&space=default"
  * @returns {Promise<any>}  JSON parseado
  */
 export const apiFetch = async (path, params = "", options = {}) => {

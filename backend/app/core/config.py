@@ -1,5 +1,20 @@
 import os
+from pathlib import Path
+from typing import Any
+
+import yaml
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def load_domain_config() -> dict[str, Any]:
+    config_path = Path(__file__).resolve().parents[2] / "config" / "domain_config.yaml"
+    if not config_path.exists():
+        return {}
+    return yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+
+
+domain_config = load_domain_config()
+tool_config = domain_config.get("tools", {})
 
 
 class Settings(BaseSettings):
@@ -13,6 +28,15 @@ class Settings(BaseSettings):
     )
 
     # --- Core ---
+    APP_NAME: str = domain_config.get("app_name", "Agentic RAG Template")
+    DEFAULT_SPACE: str = domain_config.get("default_space", "default")
+    DOMAIN: str = domain_config.get("domain", "generic")
+    LANGUAGE: str = domain_config.get("language", "es")
+    RETRIEVAL_BACKEND: str = domain_config.get("retrieval_backend", "opensearch")
+    TOOL_RETRIEVAL: bool = tool_config.get("retrieval", True)
+    TOOL_SQL: bool = tool_config.get("sql", False)
+    TOOL_CHARTS: bool = tool_config.get("charts", False)
+
     CORPUS_PATH: str = "./data/static_corpus"
     SEARCH_BACKEND: str = "bm25"
 
@@ -24,11 +48,11 @@ class Settings(BaseSettings):
     DATA_UPLOAD: str = "backend/app/api/data/user_uploads"
 
     # Search backend configuration
-    SEARCH_BACKEND: str = "opensearch"  # bm25 | opensearch
+    SEARCH_BACKEND: str = domain_config.get("retrieval_backend", "opensearch")  # bm25 | opensearch
     OPENSEARCH_HOSTS: str = "http://localhost:9200"
     OPENSEARCH_TIMEOUT: int = 30
     OPENSEARCH_VERIFY_CERTS: bool = False
-    OPENSEARCH_INDEX_PREFIX: str = "encuentra"
+    OPENSEARCH_INDEX_PREFIX: str = "rag-template"
     OPENSEARCH_BULK_CHUNK_SIZE: int = 500   # Send 500 documents per HTTP request to _bulk
     OPENSEARCH_SIGV4: bool = False
     OPENSEARCH_USERNAME: str | None = None

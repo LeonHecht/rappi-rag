@@ -51,7 +51,7 @@ def create_billing_portal_session(user: UserData = Depends(get_current_user)):
             customer = stripe.Customer.create(
                 email=user.username,
                 name=f"{user.first_name} {user.last_name}".strip() or user.username,
-                metadata={"app": "encuentra", "email": user.username},
+                metadata={"app": settings.APP_NAME, "email": user.username},
             )
             customer_id = customer["id"]
         except Exception as e:

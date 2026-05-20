@@ -83,12 +83,12 @@ tools = [
     emit_msg_tool,
     {
         "type": "function",
-        "name": "search_cases",
-        "description": "Lexical Keyword search (BM25) over indexed jurisprudence and laws.",
+        "name": "search_documents",
+        "description": "Lexical keyword search over indexed documents in the selected space.",
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "User intent in plain Spanish in keywords."},
+                "query": {"type": "string", "description": "User intent expressed as concise search keywords."},
                 "filters": {
                     "type": "object",
                     "properties": {
@@ -121,7 +121,7 @@ tools = [
     {
         "type": "function",
         "name": "fetch_document",
-        "description": "Return full text document (costly; avoid unless needed (e.g. case summaries)).",
+            "description": "Return a full text document. Costly; avoid unless the full document is needed.",
         "parameters": {
             "type":"object",
             "properties":{
@@ -188,7 +188,7 @@ def log_tool_call(step: int, name: str, args: dict, result: Any):
     └─ result: {result_info}
     """).rstrip())
 
-def search_cases(query: str, space: str = "", filters: Dict[str, Any] = {}, top_k: int = 5) -> List[Dict[str, Any]]:
+def search_documents(query: str, space: str = "", filters: Dict[str, Any] = {}, top_k: int = 5) -> List[Dict[str, Any]]:
     """ query OpenSearch and return compact hits (IDs + short snippets + meta)
     """
     # perform search; Filters will be implemented lateron (TODO)
@@ -276,9 +276,9 @@ def get_title_for_chat(last_user_msg):
 def is_respond_fast(last_user_msg):
     try:
         instruction = """
-You have the task to decide wether the user's request requires a reasoning model which has access to a legal cases database and is able to do advanced reasoning, or if a fast model without access to tools is enough.
+You have the task to decide whether the user's request requires a reasoning model with access to the configured document knowledge base, or if a fast model without access to tools is enough.
 Return 'reasoning_model' if the user's request is complex and requires deep thinking.
-Also return 'reasoning_model' if the user's request requires external knowledge from a case law database. For example, if the user asks about case law, then return 'reasoning'.
+Also return 'reasoning_model' if the user's request requires external knowledge from the configured document knowledge base.
 Return 'fast_model' if the user's request is rather simple or a general knowledge question not requiring external facts or data.
 """
         # print("\n📝 **Deciding if to respond fast**")
@@ -324,14 +324,14 @@ def run_tool(ctx: AgentContext, tool_name, tool_args) -> str:
 
         log_tool_call(ctx.iteration_count, tool_name, tool_args, "emitted")
     
-    elif tool_name == "search_cases":
+    elif tool_name == "search_documents":
         query = tool_args.get("query", ctx.last_user_msg)
         filters = tool_args.get("filters", {})
         top_k = int(tool_args.get("top_k", 5))
 
-        push_trace({"type":"tool_start","step":ctx.iteration_count,"tool":"search_cases","args":{"query": query,"filters":filters,"top_k":top_k}})
-        result = search_cases(query=query, space=ctx.space, filters=filters, top_k=top_k)
-        push_trace({"type":"tool_result","step":ctx.iteration_count,"tool":"search_cases","result_count":len(result)})
+        push_trace({"type":"tool_start","step":ctx.iteration_count,"tool":"search_documents","args":{"query": query,"filters":filters,"top_k":top_k}})
+        result = search_documents(query=query, space=ctx.space, filters=filters, top_k=top_k)
+        push_trace({"type":"tool_result","step":ctx.iteration_count,"tool":"search_documents","result_count":len(result)})
         log_tool_call(ctx.iteration_count, tool_name, tool_args, result)
 
     elif tool_name == "fetch_passages":
@@ -494,7 +494,7 @@ async def chat_agentic_stream(req: AgenticChatRequest):
 
                     if tool_name == "emit_event":
                         msg = tool_args.get("message", "Pensando")
-                    elif tool_name == "search_cases":
+                    elif tool_name == "search_documents":
                         query = tool_args.get("query", "[Consulta no disponible.]")
                         msg = f"Buscando documentos relevantes a la siguiente consulta: {query}..."
                     elif tool_name == "fetch_passages":

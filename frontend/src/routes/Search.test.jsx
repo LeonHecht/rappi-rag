@@ -17,8 +17,8 @@ const apiMock = vi.fn(async (path) => {
   if (path === 'search') {
     return {
       results: [
-        { id: '1', title: 'Case One', snippet: 'alpha beta gamma', score: 0.987, download_url: '' },
-        { id: '2', title: 'Case Two', snippet: 'delta epsilon', score: 0.765, download_url: '' },
+        { id: '1', title: 'Document One', snippet: 'alpha beta gamma', score: 0.987, download_url: '' },
+        { id: '2', title: 'Document Two', snippet: 'delta epsilon', score: 0.765, download_url: '' },
       ],
     };
   }
@@ -42,8 +42,8 @@ it('loads spaces, performs search, and renders results', async () => {
   await userEvent.click(button);
 
   // Results render
-  await screen.findByText('Case One');
-  expect(screen.getByText('Case Two')).toBeInTheDocument();
+  await screen.findByText('Document One');
+  expect(screen.getByText('Document Two')).toBeInTheDocument();
 
   // Ensure useApi called for spaces and search
   expect(apiMock).toHaveBeenCalledWith('user/spaces');

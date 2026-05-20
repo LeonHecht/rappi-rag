@@ -1,7 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import logo from '../assets/logo_full-removebg.png';
+
+const APP_NAME = 'Agentic RAG Template';
 
 export default function Navbar() {
   const { session } = useAuth();
@@ -12,14 +13,7 @@ export default function Navbar() {
   const menuRef = useRef(null);
   const [tier, setTier] = useState("free");
 
-  // const firstName = user?.user_metadata?.first_name
-  // console.log("first", firstName);
-  
-  // const lastName = user?.user_metadata?.last_name
-  // console.log("last", lastName);
-
   const fullName = user?.user_metadata?.full_name;
-
   const initial = fullName?.[0] || user?.email?.[0];
 
   useLayoutEffect(() => {
@@ -42,7 +36,6 @@ export default function Navbar() {
     };
   }, []);
 
-  // Close dropdown on outside click or escape
   useEffect(() => {
     if (!open) return;
     const onDocClick = (e) => {
@@ -58,7 +51,6 @@ export default function Navbar() {
     };
   }, [open]);
 
-  // Fetch subscription tier
   useEffect(() => {
     let active = true;
     async function fetchTier() {
@@ -79,7 +71,6 @@ export default function Navbar() {
 
   async function handleLogout() {
     try {
-      // Clear any legacy token used by API
       try { localStorage.removeItem('auth'); } catch { /* noop */ }
       const { supabase } = await import('../lib/supabaseClient');
       await supabase.auth.signOut();
@@ -91,8 +82,8 @@ export default function Navbar() {
   return (
     <nav ref={navRef} className="bg-white shadow-md z-30 relative">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between max-w-full">
-        <Link to="/" className="flex items-center hover:opacity-80 transition scale-95">
-          <img src={logo} alt="Encuentra logo" className="w-32" />
+        <Link to="/" className="flex items-center hover:opacity-80 transition">
+          <span className="text-lg font-semibold tracking-tight text-gray-900">{APP_NAME}</span>
         </Link>
         <div className="space-x-4 flex items-center">
           <Link to="/search" className="text-gray-600 hover:text-gray-700">
@@ -116,18 +107,15 @@ export default function Navbar() {
               </button>
               {open && (
                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl ring-1 ring-black/5 overflow-hidden">
-                  {/* User info section with gradient background */}
                   <div className="px-4 py-3 border-b">
                     <div className="font-semibold text-gray-900 line-clamp-1">{fullName}</div>
                     <div className="text-gray-600 text-xs line-clamp-1 mt-0.5">{user.email}</div>
-                    
-                    {/* Subscription tier badge */}
                     <div className="mt-2 inline-flex items-center gap-1.5">
                       <span className="text-xs font-medium text-gray-600">Plan:</span>
                       <span className={
                         `px-2 py-0.5 rounded-full text-xs font-semibold ` +
-                        (tier === 'free' 
-                          ? 'bg-gray-200 text-gray-700' 
+                        (tier === 'free'
+                          ? 'bg-gray-200 text-gray-700'
                           : tier === 'pro'
                           ? 'bg-indigo-600 text-white'
                           : tier === 'team'
@@ -139,14 +127,12 @@ export default function Navbar() {
                       </span>
                     </div>
                   </div>
-                  
-                  {/* Actions section */}
                   <div className="py-1">
                     <button
                       className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
                       onClick={handleLogout}
                     >
-                      Cerrar sesión
+                      Cerrar sesion
                     </button>
                   </div>
                 </div>

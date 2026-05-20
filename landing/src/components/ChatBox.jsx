@@ -1,45 +1,36 @@
 import { useState, useRef, useEffect } from 'react';
 
 const PLACEHOLDER_QUESTIONS = [
-  "¿Qué criterios hay sobre diligencia en contratos?",
-  "Muéstrame precedentes de despido injustificado.",
-  "¿Cómo interpretan los jueces la buena fe?",
-  "Revisa esta cláusula de confidencialidad por riesgos.",
-  "¿Qué reglas rigen la admisión de documentos?",
-  "Identifica riesgos en este contrato de suministro.",
-  "Búscame casos que apliquen el criterio X.",
-  "¿Cómo se entiende el interés legítimo en amparo?",
-  "Dame precedentes de responsabilidad médica por omisión.",
-  "Resume la obligación de informar en consumo con citas."
+  "Resume los documentos sobre politicas internas.",
+  "Busca informacion sobre el criterio X.",
+  "Compara estos documentos por fecha y tema.",
+  "Extrae riesgos mencionados en este archivo.",
+  "Busca documentos relacionados con este concepto.",
+  "Resume los puntos principales con citas.",
+  "Identifica contradicciones entre estos textos.",
+  "Muestra fuentes que respalden esta afirmacion.",
+  "Explica este documento para un usuario no tecnico.",
+  "Genera una respuesta basada en la base de conocimiento."
 ];
 
-/**
- * ChatBox component
- * Renders a dark rounded chat input bar similar to provided screenshot.
- * Props:
- *  - onSend(message: string): optional callback when message sent
- *  - placeholder: optional placeholder text
- */
 export default function ChatBox({ onSend, placeholder }) {
   const [value, setValue] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const textareaRef = useRef(null);
 
-  // Rotate placeholders every 2 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       setIsAnimating(true);
       setTimeout(() => {
         setCurrentIndex((prev) => (prev + 1) % PLACEHOLDER_QUESTIONS.length);
         setIsAnimating(false);
-      }, 300); // Match animation duration
+      }, 300);
     }, 2000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // Auto resize height (optional nicer UX)
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -63,7 +54,7 @@ export default function ChatBox({ onSend, placeholder }) {
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 bg-neutral-50 rounded-2xl px-3 py-2 hover:bg-neutral-100 focus:bg-neutral-100 rounded-xl transition-colors">
+      <div className="flex items-center gap-3 bg-neutral-50 rounded-2xl px-3 py-2 hover:bg-neutral-100 focus:bg-neutral-100 transition-colors">
         <div className="flex-1 relative overflow-hidden flex items-center">
           <textarea
             ref={textareaRef}
@@ -72,18 +63,19 @@ export default function ChatBox({ onSend, placeholder }) {
             onKeyDown={handleKeyDown}
             rows={1}
             className="w-full resize-none bg-transparent focus:outline-none text-sm text-neutral-800 leading-relaxed relative z-10 caret-neutral-800"
-            style={{ 
+            style={{
               color: value ? 'inherit' : 'transparent',
             }}
+            placeholder={placeholder}
           />
           {!value && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center">
-              <div 
+              <div
                 className={`text-sm text-neutral-400 leading-relaxed transition-transform duration-500 ${
                   isAnimating ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'
                 }`}
               >
-                {PLACEHOLDER_QUESTIONS[currentIndex]}
+                {placeholder || PLACEHOLDER_QUESTIONS[currentIndex]}
               </div>
             </div>
           )}

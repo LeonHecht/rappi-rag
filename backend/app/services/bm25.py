@@ -31,15 +31,16 @@ class BM25Search:
         tok = re.sub(r"[^a-z0-9]+", "", tok)
         return tok
 
-    def index(self, space="supreme_court"):
+    def index(self, space=None):
         """Load documents from CORPUS_PATH into BM25 index."""
+        space = space or settings.DEFAULT_SPACE
 
         print("Loading corpus and initializing BM25 index...")
         
         self.corpus[space] = []  # dict to hold documents for the space
         self.tokenized[space] = []  # list to hold tokenized documents for the space
 
-        if space == "supreme_court":
+        if space == settings.DEFAULT_SPACE:
             self.tokenized[space] = []
             jsonl_file = Path(settings.CORPUS_PATH) / "corpus.jsonl"
             if jsonl_file.exists():
@@ -98,7 +99,7 @@ class BM25Search:
                 return d
         return None
 
-    def search(self, query: str, top_k: int = 30, space: str = "supreme_court") -> list[dict]:
+    def search(self, query: str, top_k: int = 30, space: str | None = None) -> list[dict]:
         """
         Perform BM25 search over the loaded corpus.
 
@@ -115,6 +116,7 @@ class BM25Search:
         - snippet: first 100 words of the text
         - download_url: path under /files to fetch the original doc
         """
+        space = space or settings.DEFAULT_SPACE
         print(f"Searching in space '{space}' with query: '{query}' and top_k={top_k}")
         model = self.bm25_models[space]
         if model is None:

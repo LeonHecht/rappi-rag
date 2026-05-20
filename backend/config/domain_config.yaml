@@ -1,0 +1,9 @@
+app_name: "Agentic RAG Template"
+default_space: "default"
+domain: "generic"
+language: "es"
+retrieval_backend: "opensearch"
+tools:
+  retrieval: true
+  sql: false
+  charts: false

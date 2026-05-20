@@ -202,7 +202,7 @@ def test_get_accessible_spaces(auth_env):
 
     assert "alice@example.com/personal" in spaces
     assert "demo_org/shared" in spaces
-    assert "supreme_court" in spaces
+    assert settings.DEFAULT_SPACE in spaces
 
 
 def test_create_user_space_valid(auth_env, monkeypatch):
