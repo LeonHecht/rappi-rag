@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "http://localhost:5173"
     CORPUS_PATH: str = "data/static_corpus"
     DATA_UPLOAD: str = "backend/app/api/data/user_uploads"
+    ANALYTICS_DATA_DIR: str = "data/analytics"
+    ANALYTICS_DB_PATH: str = "data/analytics/analytics.duckdb"
+    ANALYTICS_METRIC_CONFIG: str = "backend/config/rappi_metrics.yaml"
+    ANALYTICS_MAX_ROWS: int = 200
+    ANALYTICS_ANOMALY_THRESHOLD: float = 0.10
 
     # Search backend configuration
     SEARCH_BACKEND: str = domain_config.get("retrieval_backend", "opensearch")  # bm25 | opensearch
@@ -86,9 +91,10 @@ class Settings(BaseSettings):
 
     # --- Supabase ---
     SUPABASE_URL: str | None = None
-    SUPABASE_KEY: str | None = None  # Service role key for backend (anon or service_role)
-    SUPABASE_JWKS_URL: str | None = None  # For verifying JWT tokens with new ECC keys
-    SUPABASE_JWT_SECRET: str | None = None  # Legacy HS256 shared secret
+    SUPABASE_SECRET_KEY: str | None = None  # Backend-only sb_secret_... key
+    SUPABASE_PUBLISHABLE_KEY: str | None = None  # Public sb_publishable_... key
+    SUPABASE_KEY: str | None = None  # Deprecated alias for SUPABASE_SECRET_KEY
+    SUPABASE_JWKS_URL: str | None = None  # Defaults to ${SUPABASE_URL}/auth/v1/.well-known/jwks.json
 
     # --- Stripe (optional) ---
     STRIPE_SECRET_KEY: str | None = None

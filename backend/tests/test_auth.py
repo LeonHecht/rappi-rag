@@ -5,6 +5,7 @@ import uuid
 import pytest
 
 from backend.app.core.config import settings
+from backend.app.core import security
 import backend.app.services.auth as auth
 
 
@@ -40,6 +41,62 @@ def mock_supabase(monkeypatch):
 # ============================================================================
 # Tests for Supabase-based authentication helpers
 # ============================================================================
+
+def test_get_supabase_jwks_url_prefers_explicit_url(monkeypatch):
+    monkeypatch.setattr(settings, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(settings, "SUPABASE_JWKS_URL", "https://auth.example.test/jwks.json")
+
+    assert security.get_supabase_jwks_url() == "https://auth.example.test/jwks.json"
+
+
+def test_get_supabase_jwks_url_derives_from_supabase_url(monkeypatch):
+    monkeypatch.setattr(settings, "SUPABASE_URL", "https://example.supabase.co/")
+    monkeypatch.setattr(settings, "SUPABASE_JWKS_URL", None)
+
+    assert (
+        security.get_supabase_jwks_url()
+        == "https://example.supabase.co/auth/v1/.well-known/jwks.json"
+    )
+
+
+def test_verify_supabase_token_rejects_api_keys():
+    with pytest.raises(ValueError, match="API keys are not user access tokens"):
+        security.verify_supabase_token("sb_secret_example")
+    with pytest.raises(ValueError, match="API keys are not user access tokens"):
+        security.verify_supabase_token("sb_publishable_example")
+
+
+def test_get_supabase_uses_secret_key(monkeypatch):
+    captured = {}
+    mock_client = MagicMock()
+
+    def fake_create_client(url, key):
+        captured["url"] = url
+        captured["key"] = key
+        return mock_client
+
+    monkeypatch.setattr(settings, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(settings, "SUPABASE_SECRET_KEY", "sb_secret_example")
+    monkeypatch.setattr(settings, "SUPABASE_KEY", None)
+    monkeypatch.setattr(auth, "_supabase_client", None)
+    monkeypatch.setattr(auth, "create_client", fake_create_client)
+
+    assert auth.get_supabase() is mock_client
+    assert captured == {
+        "url": "https://example.supabase.co",
+        "key": "sb_secret_example",
+    }
+
+
+def test_get_supabase_rejects_publishable_key(monkeypatch):
+    monkeypatch.setattr(settings, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(settings, "SUPABASE_SECRET_KEY", "sb_publishable_example")
+    monkeypatch.setattr(settings, "SUPABASE_KEY", None)
+    monkeypatch.setattr(auth, "_supabase_client", None)
+
+    with pytest.raises(RuntimeError, match="must be a backend-only sb_secret"):
+        auth.get_supabase()
+
 
 def test_get_or_create_user_from_supabase_new_user(auth_env, mock_supabase):
     """Test creating a new user from Supabase JWT data."""

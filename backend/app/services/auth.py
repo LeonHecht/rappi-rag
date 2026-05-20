@@ -12,16 +12,28 @@ _supabase_lock = Lock()
 
 
 def get_supabase() -> Client:
-    """Return a singleton Supabase client. Created on first use (thread-safe)."""
+    """Return a singleton backend Supabase client.
+
+    The backend must use a Supabase secret API key (`sb_secret_...`). The old
+    `SUPABASE_KEY` name is accepted as a compatibility alias.
+    """
     global _supabase_client
     if _supabase_client is None:
         with _supabase_lock:
             # Double-check pattern: another thread might have initialized while we waited
             if _supabase_client is None:
                 url = settings.SUPABASE_URL
-                key = settings.SUPABASE_KEY
+                key = settings.SUPABASE_SECRET_KEY or settings.SUPABASE_KEY
                 if not url or not key:
-                    raise RuntimeError("Supabase not configured. Set SUPABASE_URL and SUPABASE_KEY in .env")
+                    raise RuntimeError(
+                        "Supabase not configured. Set SUPABASE_URL and "
+                        "SUPABASE_SECRET_KEY in backend/.env"
+                    )
+                if key.startswith("sb_publishable_"):
+                    raise RuntimeError(
+                        "SUPABASE_SECRET_KEY must be a backend-only sb_secret_... key, "
+                        "not a publishable key"
+                    )
                 _supabase_client = create_client(url, key)
     return _supabase_client
 

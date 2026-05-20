@@ -4,6 +4,7 @@ from typing import List
 import uuid
 
 from backend.app.services.search import search_engine
+from backend.app.services.analytics import load_csv_to_duckdb
 from backend.app.core.config import settings
 from backend.app.dependencies import get_current_user
 from backend.app.services.auth import get_accessible_spaces, UserData
@@ -30,6 +31,7 @@ async def upload_file(
     space_dir.mkdir(parents=True, exist_ok=True)
 
     saved = []
+    analytics_loaded = []
     for file in files:
         # Unique file ID + preserve extension
         file_id = uuid.uuid4().hex
@@ -47,10 +49,21 @@ async def upload_file(
             "saved_path": dest.name,
         })
 
+        if ext.lower() == ".csv":
+            try:
+                analytics_loaded.append(load_csv_to_duckdb(dest))
+            except Exception as e:
+                analytics_loaded.append({
+                    "loaded": False,
+                    "filename": file.filename,
+                    "reason": f"Failed to load CSV into DuckDB: {e}",
+                })
+
     # Rebuild index for this space so the new docs are searchable
     search_engine.index(space)
 
     return {
         "space": space,
         "uploaded": saved,
+        "analytics": analytics_loaded,
     }

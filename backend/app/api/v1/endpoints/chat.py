@@ -11,6 +11,7 @@ from pathlib import Path
 from openai import OpenAI
 from backend.app.core.config import settings
 from backend.app.services.search import search_engine
+from backend.app.services import analytics
 from backend.app.dependencies import get_current_user
 
 from dataclasses import dataclass, field
@@ -132,7 +133,86 @@ retrieval_tools = [
     }
 ]
 
-tools = [emit_msg_tool, *retrieval_tools] if settings.TOOL_RETRIEVAL else [emit_msg_tool]
+analytics_tools = [
+    {
+        "type": "function",
+        "name": "describe_schema",
+        "description": "Describe available DuckDB analytics tables, columns, metrics, dimensions, week labels, and metric descriptions.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "type": "function",
+        "name": "preview_table",
+        "description": "Return sample rows from a known analytics table.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "table": {"type": "string", "enum": ["metrics_long", "orders_long"]},
+                "limit": {"type": "integer", "default": 5, "minimum": 1, "maximum": 20},
+            },
+            "required": ["table"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "validate_metric_name",
+        "description": "Map a user-provided metric phrase to exact available metric names.",
+        "parameters": {
+            "type": "object",
+            "properties": {"metric_phrase": {"type": "string"}},
+            "required": ["metric_phrase"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "run_sql",
+        "description": "Execute a safe read-only SELECT query over DuckDB analytics tables and return rows plus numeric summaries.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "sql": {"type": "string"},
+                "max_rows": {"type": "integer", "default": 200, "minimum": 1, "maximum": 500},
+            },
+            "required": ["sql"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "generate_chart",
+        "description": "Generate a frontend-friendly Plotly chart spec from a safe SQL query.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "sql": {"type": "string"},
+                "chart_type": {"type": "string", "enum": ["line", "bar", "scatter"], "default": "bar"},
+                "title": {"type": "string"},
+                "x": {"type": "string"},
+                "y": {"type": "string"},
+            },
+            "required": ["sql"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "generate_executive_report",
+        "description": "Run deterministic analytics for anomalies, trends, benchmarking, correlations, and opportunities, returning a Markdown report.",
+        "parameters": {
+            "type": "object",
+            "properties": {"threshold": {"type": "number", "default": 0.10}},
+            "additionalProperties": False,
+        },
+    },
+]
+
+tools = [emit_msg_tool]
+if settings.TOOL_RETRIEVAL:
+    tools.extend(retrieval_tools)
+if settings.TOOL_SQL:
+    tools.extend(analytics_tools)
 
 def sanitize_output_items(raw_items):
     """Convert SDK output items to API-acceptable input items."""
@@ -369,6 +449,55 @@ def run_tool(ctx: AgentContext, tool_name, tool_args) -> str:
             pass
         push_trace({"type":"tool_result","step":ctx.iteration_count,"tool":"fetch_document","result_count":1 if result else 0})
         log_tool_call(ctx.iteration_count, tool_name, tool_args, result)            
+
+    elif tool_name == "describe_schema":
+        push_trace({"type":"tool_start","step":ctx.iteration_count,"tool":"describe_schema","args":{}})
+        result = analytics.describe_schema()
+        push_trace({"type":"tool_result","step":ctx.iteration_count,"tool":"describe_schema","result_count":len(result.get("tables", []))})
+        log_tool_call(ctx.iteration_count, tool_name, tool_args, result)
+
+    elif tool_name == "preview_table":
+        table = tool_args.get("table", "")
+        limit = int(tool_args.get("limit", 5))
+        push_trace({"type":"tool_start","step":ctx.iteration_count,"tool":"preview_table","args":{"table":table,"limit":limit}})
+        result = analytics.preview_table(table=table, limit=limit)
+        push_trace({"type":"tool_result","step":ctx.iteration_count,"tool":"preview_table","result_count":result.get("row_count", 0) if isinstance(result, dict) else 0})
+        log_tool_call(ctx.iteration_count, tool_name, tool_args, result)
+
+    elif tool_name == "validate_metric_name":
+        phrase = tool_args.get("metric_phrase", "")
+        push_trace({"type":"tool_start","step":ctx.iteration_count,"tool":"validate_metric_name","args":{"metric_phrase":phrase}})
+        result = analytics.validate_metric_name(phrase)
+        push_trace({"type":"tool_result","step":ctx.iteration_count,"tool":"validate_metric_name","result_count":len(result.get("candidates", [])) if isinstance(result, dict) else 0})
+        log_tool_call(ctx.iteration_count, tool_name, tool_args, result)
+
+    elif tool_name == "run_sql":
+        sql = tool_args.get("sql", "")
+        max_rows = int(tool_args.get("max_rows", settings.ANALYTICS_MAX_ROWS))
+        push_trace({"type":"tool_start","step":ctx.iteration_count,"tool":"run_sql","args":{"sql":sql,"max_rows":max_rows}})
+        result = analytics.run_sql(sql=sql, max_rows=max_rows)
+        push_trace({"type":"tool_result","step":ctx.iteration_count,"tool":"run_sql","result_count":result.get("row_count", 0) if isinstance(result, dict) else 0})
+        log_tool_call(ctx.iteration_count, tool_name, tool_args, result)
+
+    elif tool_name == "generate_chart":
+        sql = tool_args.get("sql", "")
+        chart_type = tool_args.get("chart_type", "bar")
+        push_trace({"type":"tool_start","step":ctx.iteration_count,"tool":"generate_chart","args":{"sql":sql,"chart_type":chart_type}})
+        result = analytics.generate_chart(
+            sql=sql,
+            chart_type=chart_type,
+            title=tool_args.get("title"),
+            x=tool_args.get("x"),
+            y=tool_args.get("y"),
+        )
+        push_trace({"type":"tool_result","step":ctx.iteration_count,"tool":"generate_chart","result_count":1 if isinstance(result, dict) and not result.get("error") else 0})
+        log_tool_call(ctx.iteration_count, tool_name, tool_args, result)
+
+    elif tool_name == "generate_executive_report":
+        push_trace({"type":"tool_start","step":ctx.iteration_count,"tool":"generate_executive_report","args":tool_args})
+        result = analytics.generate_executive_report(threshold=tool_args.get("threshold"))
+        push_trace({"type":"tool_result","step":ctx.iteration_count,"tool":"generate_executive_report","result_count":1})
+        log_tool_call(ctx.iteration_count, tool_name, tool_args, "markdown_report")
     
     else:
         print(f"❌ **Unknown tool name: {tool_name}**")
@@ -502,6 +631,18 @@ async def chat_agentic_stream(req: AgenticChatRequest):
                         msg = "Recuperando pasajes relevantes..."
                     elif tool_name == "fetch_document":
                         msg = "Recuperando documentos relevantes..."
+                    elif tool_name == "describe_schema":
+                        msg = "Revisando el esquema de datos analíticos..."
+                    elif tool_name == "preview_table":
+                        msg = "Inspeccionando una muestra de la tabla..."
+                    elif tool_name == "validate_metric_name":
+                        msg = "Validando el nombre exacto de la métrica..."
+                    elif tool_name == "run_sql":
+                        msg = "Ejecutando una consulta SQL analítica..."
+                    elif tool_name == "generate_chart":
+                        msg = "Generando una especificación de gráfica..."
+                    elif tool_name == "generate_executive_report":
+                        msg = "Generando un reporte ejecutivo de analítica..."
                     else:
                         break
                     
