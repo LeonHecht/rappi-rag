@@ -8,6 +8,7 @@ import json
 import textwrap
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from openai import OpenAI
 from backend.app.core.config import settings
 from backend.app.services.search import search_engine
@@ -513,6 +514,55 @@ def dedupe_citations(cites: list[dict]) -> list[dict]:
             out.append(c); seen.add(did)
     return out
 
+def tool_progress_message(tool_name: str, tool_args: dict[str, Any]) -> str | None:
+    if tool_name == "emit_event":
+        return tool_args.get("message", "Pensando")
+    if tool_name == "search_documents":
+        query = tool_args.get("query", "[Consulta no disponible.]")
+        return f"Buscando documentos relevantes a la siguiente consulta: {query}..."
+    if tool_name == "fetch_passages":
+        return "Recuperando pasajes relevantes..."
+    if tool_name == "fetch_document":
+        return "Recuperando documentos relevantes..."
+    if tool_name == "describe_schema":
+        return "Revisando el esquema de datos analíticos..."
+    if tool_name == "preview_table":
+        return "Inspeccionando una muestra de la tabla..."
+    if tool_name == "validate_metric_name":
+        return "Validando el nombre exacto de la métrica..."
+    if tool_name == "run_sql":
+        return "Ejecutando una consulta SQL analítica..."
+    if tool_name == "generate_chart":
+        return "Generando una especificación de gráfica..."
+    if tool_name == "generate_executive_report":
+        return "Generando un reporte ejecutivo de analítica..."
+    return None
+
+def parse_emit_event_text(text: str) -> str | None:
+    """Treat plain-text emit_event JSON as a progress event, not answer text."""
+    raw = (text or "").strip()
+    if not (raw.startswith("{") and raw.endswith("}")):
+        return None
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    msg = payload.get("message")
+    if isinstance(msg, str) and msg.strip():
+        return msg.strip()
+    return None
+
+def parse_partial_emit_event_message(arguments: str) -> str | None:
+    match = re.search(r'"message"\s*:\s*"((?:\\.|[^"\\])*)"', arguments or "")
+    if not match:
+        return None
+    try:
+        return json.loads(f'"{match.group(1)}"').strip()
+    except Exception:
+        return match.group(1).strip()
+
 import asyncio
 import json
 
@@ -590,8 +640,10 @@ async def chat_agentic_stream(req: AgenticChatRequest):
 
             # Local accumulators for this streamed turn
             acc_text: list[str] = []
+            pending_text: list[str] = []
             
             final_tool_calls = {}
+            emitted_tool_call_indices = set()
             for ev in stream:
                 t = getattr(ev, "type", None)
 
@@ -599,8 +651,19 @@ async def chat_agentic_stream(req: AgenticChatRequest):
                 if t == "response.output_item.added":
                     if ev.item.type == "function_call":
                         final_tool_calls[ev.output_index] = ev.item
+                        msg = tool_progress_message(ev.item.name, {})
+                        if msg:
+                            await asyncio.sleep(0)
+                            async for chunk in emit("response.emit_message", {"step": ctx.iteration_count, "msg": msg}):
+                                yield chunk
+                            if ev.item.name != "emit_event":
+                                emitted_tool_call_indices.add(ev.output_index)
                     elif ev.item.type == "reasoning":
                         pass  # no action needed
+                if t == "response.output_item.done":
+                    item = getattr(ev, "item", None)
+                    if getattr(item, "type", None) == "function_call":
+                        final_tool_calls[ev.output_index] = item
 
                 # Reasoning (UI)
                 if t == "response.reasoning_summary_text.delta":
@@ -613,42 +676,41 @@ async def chat_agentic_stream(req: AgenticChatRequest):
                 # Function tools
                 if t == "response.function_call_arguments.delta":
                     index = ev.output_index
-                    if final_tool_calls[index]:
+                    if final_tool_calls.get(index):
                         final_tool_calls[index].arguments += ev.delta
+                        tool_call = final_tool_calls[index]
+                        if getattr(tool_call, "name", None) == "emit_event" and index not in emitted_tool_call_indices:
+                            msg = parse_partial_emit_event_message(getattr(tool_call, "arguments", ""))
+                            if msg:
+                                await asyncio.sleep(0)
+                                async for chunk in emit("response.emit_message", {"step": ctx.iteration_count, "msg": msg}):
+                                    yield chunk
+                                emitted_tool_call_indices.add(index)
 
                 if t == "response.function_call_arguments.done":
                     index = ev.output_index
+                    if index not in final_tool_calls:
+                        final_tool_calls[index] = SimpleNamespace(
+                            type="function_call",
+                            name=getattr(ev, "name", None),
+                            arguments=getattr(ev, "arguments", "{}"),
+                            call_id=getattr(ev, "call_id", None),
+                        )
                     tool_call = final_tool_calls[index]
+                    if getattr(ev, "arguments", None):
+                        tool_call.arguments = ev.arguments
                     tool_name = getattr(tool_call, "name")
                     tool_args = json.loads(getattr(tool_call, "arguments"))
 
-                    if tool_name == "emit_event":
-                        msg = tool_args.get("message", "Pensando")
-                    elif tool_name == "search_documents":
-                        query = tool_args.get("query", "[Consulta no disponible.]")
-                        msg = f"Buscando documentos relevantes a la siguiente consulta: {query}..."
-                    elif tool_name == "fetch_passages":
-                        msg = "Recuperando pasajes relevantes..."
-                    elif tool_name == "fetch_document":
-                        msg = "Recuperando documentos relevantes..."
-                    elif tool_name == "describe_schema":
-                        msg = "Revisando el esquema de datos analíticos..."
-                    elif tool_name == "preview_table":
-                        msg = "Inspeccionando una muestra de la tabla..."
-                    elif tool_name == "validate_metric_name":
-                        msg = "Validando el nombre exacto de la métrica..."
-                    elif tool_name == "run_sql":
-                        msg = "Ejecutando una consulta SQL analítica..."
-                    elif tool_name == "generate_chart":
-                        msg = "Generando una especificación de gráfica..."
-                    elif tool_name == "generate_executive_report":
-                        msg = "Generando un reporte ejecutivo de analítica..."
-                    else:
+                    msg = tool_progress_message(tool_name, tool_args)
+                    if not msg:
                         break
                     
-                    await asyncio.sleep(0)  # optional, helps flush
-                    async for chunk in emit("response.emit_message", {"step": ctx.iteration_count, "msg": msg}):
-                        yield chunk
+                    if index not in emitted_tool_call_indices:
+                        await asyncio.sleep(0)  # optional, helps flush
+                        async for chunk in emit("response.emit_message", {"step": ctx.iteration_count, "msg": msg}):
+                            yield chunk
+                        emitted_tool_call_indices.add(index)
                     
                     break
                 
@@ -656,12 +718,39 @@ async def chat_agentic_stream(req: AgenticChatRequest):
                 if t == "response.output_text.delta":
                     d = getattr(ev, "delta", "") or ""
                     acc_text.append(d)
-                    await asyncio.sleep(0)  # optional, helps flush
-                    async for chunk in emit("response.output_text.delta", {"step": ctx.iteration_count, "delta": d}):
-                        yield chunk
+                    current_text = "".join(acc_text)
+                    if current_text.lstrip().startswith("{"):
+                        pending_text.append(d)
+                    else:
+                        if pending_text:
+                            d = "".join(pending_text) + d
+                            pending_text.clear()
+                        await asyncio.sleep(0)  # optional, helps flush
+                        async for chunk in emit("response.output_text.delta", {"step": ctx.iteration_count, "delta": d}):
+                            yield chunk
                 if t == "response.output_text.done":
                     txt = getattr(ev, "text", "") or ""
-                    ctx.final_answer = txt or "".join(acc_text)
+                    done_text = txt or "".join(acc_text)
+                    progress_msg = parse_emit_event_text(done_text)
+                    if progress_msg:
+                        await asyncio.sleep(0)
+                        async for chunk in emit("response.emit_message", {"step": ctx.iteration_count, "msg": progress_msg}):
+                            yield chunk
+                        ctx.openai_messages.append({
+                            "role": "assistant",
+                            "content": f"[progress note shown to user: {progress_msg}]",
+                        })
+                        ctx.openai_messages.append({
+                            "role": "user",
+                            "content": "Continue with the task. Do not output emit_event JSON as text; either call tools or provide the final answer.",
+                        })
+                        continue
+                    ctx.final_answer = done_text
+                    if pending_text:
+                        await asyncio.sleep(0)
+                        async for chunk in emit("response.output_text.delta", {"step": ctx.iteration_count, "delta": "".join(pending_text)}):
+                            yield chunk
+                        pending_text.clear()
                     await asyncio.sleep(0)  # optional, helps flush
                     async for chunk in emit("response.output_text.done", {"step": ctx.iteration_count, "text": ctx.final_answer}):
                         yield chunk
@@ -685,6 +774,14 @@ async def chat_agentic_stream(req: AgenticChatRequest):
                 tool_name = getattr(tool_call, "name")
                 tool_args = json.loads(getattr(tool_call, "arguments"))
                 call_id = getattr(tool_call, "call_id")
+
+                if tool_call_index not in emitted_tool_call_indices:
+                    msg = tool_progress_message(tool_name, tool_args)
+                    if msg:
+                        await asyncio.sleep(0)
+                        async for chunk in emit("response.emit_message", {"step": ctx.iteration_count, "msg": msg}):
+                            yield chunk
+                        emitted_tool_call_indices.add(tool_call_index)
 
                 ctx.openai_messages.append({
                     "type": "function_call",
@@ -734,4 +831,12 @@ async def chat_agentic_stream(req: AgenticChatRequest):
         async for chunk in emit("response.completed", completed_payload):
             yield chunk
     
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
