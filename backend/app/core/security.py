@@ -1,83 +1,64 @@
 from __future__ import annotations
 
+from typing import Dict
+
 import jwt
 from jwt import PyJWKClient
-from typing import Dict
+
 from .config import settings
 
-# DEPRECATED: Legacy token store for backward compatibility
+# Deprecated token store kept only for older local tests/helpers that still
+# import verify_access_token directly.
 tokens_db: Dict[str, str] = {}
 
 
-def verify_supabase_token(token: str) -> dict:
-    """Verify a Supabase JWT token and return the payload.
-    
-    This function supports both:
-    1. New ECC P-256 keys (ES256) via JWKS endpoint
-    2. Legacy HS256 shared secret for backward compatibility
-    
-    Args:
-        token: The JWT token from Supabase
-        
-    Returns:
-        dict: Token payload containing user info (sub, email, user_metadata, etc.)
-        
-    Raises:
-        ValueError: If token is invalid or expired
-    """
-    # Try ES256 via JWKS first (for new ECC keys)
+def get_supabase_jwks_url() -> str | None:
+    """Return the configured or conventional Supabase JWKS endpoint."""
     if settings.SUPABASE_JWKS_URL:
-        try:
-            jwk_client = PyJWKClient(settings.SUPABASE_JWKS_URL)
-            signing_key = jwk_client.get_signing_key_from_jwt(token)
-            payload = jwt.decode(
-                token,
-                signing_key.key,
-                algorithms=["ES256", "RS256"],
-                options={"verify_aud": False},  # Supabase uses aud='authenticated'
-            )
-            # print(f"Token verified via JWKS (ES256)")
-            return payload
-        except jwt.ExpiredSignatureError:
-            raise ValueError("Token has expired")
-        except Exception as e:
-            # If JWKS verification fails, try HS256 fallback
-            print(f"⚠️  JWKS verification failed: {e}")
-            pass
-    
-    # Fallback to HS256 (legacy shared secret)
-    if settings.SUPABASE_JWT_SECRET:
-        try:
-            payload = jwt.decode(
-                token,
-                settings.SUPABASE_JWT_SECRET,
-                algorithms=["HS256"],
-                options={"verify_aud": False},
-            )
-            return payload
-        except jwt.ExpiredSignatureError:
-            raise ValueError("Token has expired")
-        except jwt.InvalidTokenError as e:
-            raise ValueError(f"Invalid token: {str(e)}")
-        except Exception as e:
-            print(f"⚠️  HS256 verification failed: {e}")
-    
-    raise ValueError("Unable to verify token: No valid verification method configured")
+        return settings.SUPABASE_JWKS_URL
+    if settings.SUPABASE_URL:
+        return f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+    return None
+
+
+def verify_supabase_token(token: str) -> dict:
+    """Verify a Supabase Auth user access token via JWT signing keys.
+
+    Publishable and secret API keys (`sb_publishable_...` / `sb_secret_...`)
+    are opaque API keys, not user JWTs. The frontend must send the signed-in
+    user's Supabase Auth access token in the Authorization header.
+    """
+    if token.startswith("sb_publishable_") or token.startswith("sb_secret_"):
+        raise ValueError("Supabase API keys are not user access tokens")
+
+    jwks_url = get_supabase_jwks_url()
+    if not jwks_url:
+        raise ValueError("Unable to verify token: SUPABASE_URL or SUPABASE_JWKS_URL is required")
+
+    try:
+        jwk_client = PyJWKClient(jwks_url)
+        signing_key = jwk_client.get_signing_key_from_jwt(token)
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["ES256", "RS256"],
+            options={"verify_aud": False},  # Supabase uses aud='authenticated'
+        )
+    except jwt.ExpiredSignatureError:
+        raise ValueError("Token has expired")
+    except jwt.InvalidTokenError as e:
+        raise ValueError(f"Invalid token: {str(e)}")
+    except Exception as e:
+        raise ValueError(f"Unable to verify token via Supabase JWKS: {e}")
 
 
 def verify_access_token(token: str) -> dict:
-    """DEPRECATED: Use verify_supabase_token instead.
-    
-    This function attempts to verify as a Supabase token first,
-    then falls back to the legacy token store for backward compatibility.
-    """
-    # Try Supabase JWT first
+    """Deprecated compatibility wrapper for older tests/helpers."""
     try:
         return verify_supabase_token(token)
     except ValueError:
         pass
-    
-    # Fallback to legacy token store
+
     username = tokens_db.get(token)
     if not username:
         raise ValueError("Invalid token")

@@ -85,13 +85,60 @@ OPENAI_API_KEY=
 OPENAI_CHAT_MODEL=gpt-5-nano
 ```
 
+## SQL Analytics Tools
+
+Structured CSV datasets can be loaded into DuckDB and queried by the chat agent when `TOOL_SQL=true`.
+
+```env
+TOOL_SQL=true
+TOOL_CHARTS=true
+ANALYTICS_DATA_DIR=data/analytics
+ANALYTICS_DB_PATH=data/analytics/analytics.duckdb
+ANALYTICS_METRIC_CONFIG=backend/config/rappi_metrics.yaml
+```
+
+Supported CSV layouts:
+
+- Metrics: `COUNTRY, CITY, ZONE, ZONE_TYPE, ZONE_PRIORITIZATION, METRIC, L8W_VALUE ... L0W_VALUE`
+- Orders: `COUNTRY, CITY, ZONE, METRIC, L8W ... L0W`
+
+The loader writes long-form tables into DuckDB:
+
+- `metrics_long(country, city, zone, zone_type, zone_prioritization, metric, week, value)`
+- `orders_long(country, city, zone, metric, week, orders)`
+
+CSV files uploaded through `/upload` are saved as before; recognized analytics CSVs are also appended to the configured DuckDB database.
+
+To load a local directory manually:
+
+```bash
+python -c "from backend.app.services.analytics import load_csv_directory; print(load_csv_directory('data/analytics/input'))"
+```
+
+Analytics tools available to the LLM:
+
+- `describe_schema` for tables, columns, metrics, dimensions, week labels, and metric descriptions.
+- `preview_table` for sample rows from safe known tables.
+- `validate_metric_name` for exact/fuzzy metric mapping.
+- `run_sql` for safe read-only SELECT queries with row limits and numeric summaries.
+- `generate_chart` for Plotly-compatible line, bar, and scatter specs.
+- `generate_executive_report` for deterministic anomalies, trends, benchmarking, correlations, and opportunities.
+
+Example Rappi-style questions:
+
+- "¿Cuáles son las 5 zonas con mayor Lead Penetration esta semana?"
+- "Compara Perfect Orders entre zonas Wealthy y Non Wealthy en México"
+- "Muestra la evolución de Gross Profit UE en Chapinero las últimas 8 semanas"
+- "¿Cuál es el promedio de Lead Penetration por país?"
+- "¿Qué zonas tienen alto Lead Penetration pero bajo Perfect Orders?"
+- "¿Cuáles son las zonas que más crecen en órdenes en las últimas 5 semanas y qué podría explicar el crecimiento?"
+
 Supabase and Stripe are optional unless you use authenticated app flows and billing:
 
 ```env
 SUPABASE_URL=
-SUPABASE_KEY=
-SUPABASE_JWKS_URL=
-SUPABASE_JWT_SECRET=
+SUPABASE_SECRET_KEY= # backend-only sb_secret_... key
+SUPABASE_JWKS_URL= # optional; defaults to ${SUPABASE_URL}/auth/v1/.well-known/jwks.json
 
 STRIPE_SECRET_KEY=
 BILLING_RETURN_URL=http://localhost:5173/settings/billing
@@ -104,6 +151,12 @@ Run the focused backend suite with BM25:
 
 ```bash
 env SEARCH_BACKEND=bm25 .venv/bin/python -m pytest -q backend/tests/test_auth.py backend/tests/test_search_chat_files.py
+```
+
+Run SQL analytics tests:
+
+```bash
+.venv/bin/python -m pytest -q backend/tests/test_analytics.py
 ```
 
 Run the same suite against OpenSearch after starting a local OpenSearch service:

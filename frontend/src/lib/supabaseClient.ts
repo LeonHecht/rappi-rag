@@ -1,9 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as
-  | string
-  | undefined
+const supabasePublishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY) as string | undefined
 
 // In test mode, provide a minimal no-op client if env vars are not set,
 // so unit tests that forget to mock don't crash the test collector.
@@ -32,8 +31,8 @@ const isTest =
   (typeof process !== 'undefined' && (process as any).env?.VITEST)
 
 export const supabase: SupabaseClient =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
+  supabaseUrl && supabasePublishableKey
+    ? createClient(supabaseUrl, supabasePublishableKey)
     : isTest
     ? makeTestClient()
     : (() => {
