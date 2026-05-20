@@ -79,7 +79,16 @@ vi.mock('@/components/ai-elements/message', () => ({
 }))
 vi.mock('@/components/ai-elements/response', () => ({ Response: ({ children }: any) => <div>{children}</div> }))
 vi.mock('@/components/ai-elements/reasoning', () => ({
-  Reasoning: ({ children }: any) => <div>{children}</div>,
+  Reasoning: ({ children, duration, isStreaming, message }: any) => (
+    <div
+      data-testid="reasoning"
+      data-duration={duration}
+      data-message={message}
+      data-streaming={String(isStreaming)}
+    >
+      {children}
+    </div>
+  ),
   ReasoningTrigger: () => null,
   ReasoningContent: ({ children }: any) => <div>{children}</div>,
 }))
@@ -100,6 +109,16 @@ function sseStream(frames: { event: string, data: any }[]) {
         const chunk = `event:${f.event}\ndata:${JSON.stringify(f.data)}\n\n`
         controller.enqueue(encoder.encode(chunk))
       }
+      controller.close()
+    },
+  })
+}
+
+function rawStream(chunks: string[]) {
+  const encoder = new TextEncoder()
+  return new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk))
       controller.close()
     },
   })
@@ -154,6 +173,43 @@ describe('Chat route component', () => {
       // We expect at least one assistant message container with final text
       const msgs = screen.getAllByText('Hola asistente')
       expect(msgs.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('handles chunked CRLF SSE and updates reasoning live', async () => {
+    vi.mocked(fetch).mockImplementation((url: string) => {
+      if (url.includes('/v1/chat/agentic/stream')) {
+        return Promise.resolve({
+          ok: true,
+          body: rawStream([
+            'event: response.emit_message\r\n',
+            'data: {"msg":"Buscando documentos"}\r\n\r\n',
+            'event: response.output_text.delta\r\n',
+            'data: {"delta":"Hola"}\r\n\r\n',
+            'event: response.output_text.delta\r\n',
+            'data: {"delta":" en vivo"}\r\n\r\n',
+            'event: response.completed\r\n',
+            'data: {"citations":[]}\r\n\r\n',
+          ]),
+        }) as any
+      }
+      if (url.includes('/v1/user/spaces')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ spaces: ['public'] }) }) as any
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) }) as any
+    })
+
+    render(<MemoryRouter><Chat /></MemoryRouter>)
+    const textarea = screen.getByPlaceholderText(/Pregunta lo que quieras/)
+    await userEvent.type(textarea, 'Hola')
+    await userEvent.click(screen.getByRole('button', { name: /submit/i }))
+
+    await screen.findByText('Buscando documentos')
+    expect(screen.getByTestId('reasoning')).toHaveAttribute('data-message', 'Buscando documentos')
+    await screen.findByText('Hola en vivo')
+    await waitFor(() => {
+      expect(screen.getByTestId('reasoning')).toHaveAttribute('data-streaming', 'false')
+      expect(screen.getByTestId('reasoning')).toHaveAttribute('data-duration', '1')
     })
   })
 })

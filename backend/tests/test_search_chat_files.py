@@ -117,3 +117,178 @@ def test_file_upload_creates_file_and_indexes(test_env, monkeypatch):
     path = Path(settings.DATA_UPLOAD) / "alice" / "personal" / saved
     assert path.exists()
     assert indexed == ["alice/personal"]
+
+
+def test_stream_emits_progress_before_tool_execution(monkeypatch):
+    class FakeStream:
+        def __init__(self, events):
+            self.events = events
+
+        def __iter__(self):
+            return iter(self.events)
+
+        def close(self):
+            pass
+
+    tool_item = SimpleNamespace(
+        type="function_call",
+        name="emit_event",
+        arguments='{"message":"Voy a consultar los datos"}',
+        call_id="call_1",
+    )
+
+    class FakeResponsesAPI:
+        def create(self, **kwargs):
+            has_tool_output = any(
+                isinstance(item, dict) and item.get("type") == "function_call_output"
+                for item in kwargs.get("input", [])
+            )
+            if has_tool_output:
+                return FakeStream([
+                    SimpleNamespace(type="response.output_text.delta", delta="Listo"),
+                    SimpleNamespace(type="response.output_text.done", text="Listo"),
+                    SimpleNamespace(type="response.completed"),
+                ])
+            return FakeStream([
+                SimpleNamespace(type="response.output_item.done", output_index=0, item=tool_item),
+                SimpleNamespace(type="response.completed"),
+            ])
+
+    fake_client = SimpleNamespace(responses=FakeResponsesAPI())
+    monkeypatch.setattr(chat_ep, "get_openai_client", lambda: fake_client)
+    monkeypatch.setattr(chat_ep, "run_tool", lambda ctx, tool_name, tool_args: '{"ok": true}')
+    monkeypatch.setattr(chat_ep, "get_title_for_chat", lambda last_user_msg: "Test")
+
+    async def collect_stream():
+        req = chat_ep.AgenticChatRequest(
+            space="personal",
+            messages=[{"role": "user", "content": "Analiza ventas"}],
+        )
+        response = await chat_ep.chat_agentic_stream(req)
+        chunks = []
+        async for chunk in response.body_iterator:
+            chunks.append(chunk.decode("utf-8"))
+        return "".join(chunks)
+
+    body = asyncio.run(collect_stream())
+
+    assert "event: response.emit_message" in body
+    assert "Voy a consultar los datos" in body
+    assert body.index("Voy a consultar los datos") < body.index("Listo")
+
+
+def test_stream_converts_plain_emit_event_json_to_progress(monkeypatch):
+    class FakeStream:
+        def __init__(self, events):
+            self.events = events
+
+        def __iter__(self):
+            return iter(self.events)
+
+        def close(self):
+            pass
+
+    calls = {"count": 0}
+
+    class FakeResponsesAPI:
+        def create(self, **kwargs):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                text = '{"kind":"decision","message":"Revisaré el esquema"}'
+                return FakeStream([
+                    SimpleNamespace(type="response.output_text.delta", delta=text[:20]),
+                    SimpleNamespace(type="response.output_text.delta", delta=text[20:]),
+                    SimpleNamespace(type="response.output_text.done", text=text),
+                    SimpleNamespace(type="response.completed"),
+                ])
+            return FakeStream([
+                SimpleNamespace(type="response.output_text.delta", delta="El promedio es 42%."),
+                SimpleNamespace(type="response.output_text.done", text="El promedio es 42%."),
+                SimpleNamespace(type="response.completed"),
+            ])
+
+    fake_client = SimpleNamespace(responses=FakeResponsesAPI())
+    monkeypatch.setattr(chat_ep, "get_openai_client", lambda: fake_client)
+    monkeypatch.setattr(chat_ep, "get_title_for_chat", lambda last_user_msg: "Test")
+
+    async def collect_stream():
+        req = chat_ep.AgenticChatRequest(
+            space="personal",
+            messages=[{"role": "user", "content": "Promedio por país"}],
+        )
+        response = await chat_ep.chat_agentic_stream(req)
+        chunks = []
+        async for chunk in response.body_iterator:
+            chunks.append(chunk.decode("utf-8"))
+        return "".join(chunks)
+
+    body = asyncio.run(collect_stream())
+
+    assert "event: response.emit_message" in body
+    assert "Revisaré el esquema" in body
+    assert "event: response.output_text.delta" in body
+    assert "El promedio es 42%." in body
+    assert '{"kind":"decision"' not in body
+
+
+def test_stream_emits_progress_when_tool_call_item_is_added(monkeypatch):
+    class FakeStream:
+        def __init__(self, events):
+            self.events = events
+
+        def __iter__(self):
+            return iter(self.events)
+
+        def close(self):
+            pass
+
+    tool_item = SimpleNamespace(
+        type="function_call",
+        name="run_sql",
+        arguments="",
+        call_id="call_1",
+    )
+
+    class FakeResponsesAPI:
+        def create(self, **kwargs):
+            has_tool_output = any(
+                isinstance(item, dict) and item.get("type") == "function_call_output"
+                for item in kwargs.get("input", [])
+            )
+            if has_tool_output:
+                return FakeStream([
+                    SimpleNamespace(type="response.output_text.delta", delta="Resultado final"),
+                    SimpleNamespace(type="response.output_text.done", text="Resultado final"),
+                    SimpleNamespace(type="response.completed"),
+                ])
+            return FakeStream([
+                SimpleNamespace(type="response.output_item.added", output_index=0, item=tool_item),
+                SimpleNamespace(type="response.function_call_arguments.delta", output_index=0, delta='{"sql":"select 1"'),
+                SimpleNamespace(type="response.function_call_arguments.delta", output_index=0, delta="}"),
+                SimpleNamespace(type="response.function_call_arguments.done", output_index=0, arguments='{"sql":"select 1"}'),
+                SimpleNamespace(type="response.output_item.done", output_index=0, item=tool_item),
+                SimpleNamespace(type="response.completed"),
+            ])
+
+    fake_client = SimpleNamespace(responses=FakeResponsesAPI())
+    monkeypatch.setattr(chat_ep, "get_openai_client", lambda: fake_client)
+    monkeypatch.setattr(chat_ep, "run_tool", lambda ctx, tool_name, tool_args: '{"rows": [{"x": 1}]}')
+    monkeypatch.setattr(chat_ep, "get_title_for_chat", lambda last_user_msg: "Test")
+
+    async def collect_stream():
+        req = chat_ep.AgenticChatRequest(
+            space="personal",
+            messages=[{"role": "user", "content": "Consulta datos"}],
+        )
+        response = await chat_ep.chat_agentic_stream(req)
+        chunks = []
+        async for chunk in response.body_iterator:
+            chunks.append(chunk.decode("utf-8"))
+        return "".join(chunks)
+
+    body = asyncio.run(collect_stream())
+
+    assert "event: response.emit_message" in body
+    assert "Ejecutando una consulta SQL analítica" in body
+    assert body.count("Ejecutando una consulta SQL analítica") == 1
+    assert body.index("Ejecutando una consulta SQL analítica") < body.index("Resultado final")

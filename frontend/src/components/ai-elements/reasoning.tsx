@@ -18,6 +18,7 @@ type ReasoningContextValue = {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   duration: number;
+  message?: string;
 };
 
 const ReasoningContext = createContext<ReasoningContextValue | null>(null);
@@ -32,6 +33,7 @@ const useReasoning = () => {
 
 export type ReasoningProps = ComponentProps<typeof Collapsible> & {
   isStreaming?: boolean;
+  message?: string;
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -45,6 +47,7 @@ export const Reasoning = memo(
   ({
     className,
     isStreaming = false,
+    message,
     open,
     defaultOpen = true,
     onOpenChange,
@@ -96,7 +99,7 @@ export const Reasoning = memo(
 
     return (
       <ReasoningContext.Provider
-        value={{ isStreaming, isOpen, setIsOpen, duration }}
+        value={{ isStreaming, isOpen, setIsOpen, duration, message }}
       >
         <Collapsible
           className={cn("not-prose mb-4", className)}
@@ -113,11 +116,15 @@ export const Reasoning = memo(
 
 export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger>;
 
-const getThinkingMessage = (isStreaming: boolean, duration?: number) => {
-  if (isStreaming || duration === 0) {
-    return <Shimmer duration={1}>Pensando</Shimmer>;
+const getThinkingMessage = (
+  isStreaming: boolean,
+  duration?: number,
+  message?: string
+) => {
+  if (isStreaming) {
+    return <Shimmer duration={1}>{message || "Pensando"}</Shimmer>;
   }
-  if (duration === undefined) {
+  if (duration === undefined || duration === 0) {
     return <p>Pensado durante un par de segundos</p>;
   }
   return <p>Pensado durante {duration} segundos</p>;
@@ -125,7 +132,7 @@ const getThinkingMessage = (isStreaming: boolean, duration?: number) => {
 
 export const ReasoningTrigger = memo(
   ({ className, children, ...props }: ReasoningTriggerProps) => {
-    const { isStreaming, isOpen, duration } = useReasoning();
+    const { isStreaming, isOpen, duration, message } = useReasoning();
 
     return (
       <CollapsibleTrigger
@@ -138,7 +145,7 @@ export const ReasoningTrigger = memo(
         {children ?? (
           <>
             <BrainIcon className="size-4" />
-            {getThinkingMessage(isStreaming, duration)}
+            {getThinkingMessage(isStreaming, duration, message)}
             <ChevronDownIcon
               className={cn(
                 "size-4 transition-transform",
