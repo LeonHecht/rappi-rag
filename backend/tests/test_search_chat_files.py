@@ -31,9 +31,9 @@ def test_env(tmp_path, monkeypatch):
     corpus_dir.mkdir(parents=True, exist_ok=True)
     corpus_file = corpus_dir / "corpus.jsonl"
     corpus_file.write_text(
-        '{"id": "1", "title": "Documento de resolucion", "text": "La resolucion del proceso..."}\n'
-        '{"id": "2", "title": "Documento informativo", "text": "Contenido general sin coincidencias."}\n'
-        '{"id": "3", "title": "Manual interno", "text": "Texto adicional para estabilizar BM25."}\n',
+        '{"id": "1", "title": "Product Handbook", "text": "The handbook explains document retrieval workflows."}\n'
+        '{"id": "2", "title": "Support Policy", "text": "Priority levels guide support responses."}\n'
+        '{"id": "3", "title": "Security Overview", "text": "Security guidance covers secrets and uploads."}\n',
         encoding="utf-8",
     )
     monkeypatch.setattr(settings, "CORPUS_PATH", str(corpus_dir))
@@ -96,7 +96,7 @@ def fake_openai(monkeypatch):
 
 def test_search_basic(test_env):
     user = test_env
-    resp = search_ep.search(q="resolucion", top_k=3, space=settings.DEFAULT_SPACE, user=user)
+    resp = search_ep.search(q="handbook", top_k=3, space=settings.DEFAULT_SPACE, user=user)
     assert resp.results
     hit = resp.results[0]
     assert hit.score > 0

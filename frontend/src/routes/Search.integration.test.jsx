@@ -20,7 +20,7 @@ const apiMock = vi.fn(async (path, qs = '') => {
 
   if (path === 'search') {
     const q = new URLSearchParams(qs.replace(/^\?/, '')).get('q') || ''
-    if (q === 'derecho') {
+    if (q === 'handbook') {
       return {
         results: [
           { id: 'doc-1', title: 'Document 123', score: 0.87, snippet: 'alpha policy' },
@@ -60,7 +60,7 @@ describe('<Search />', () => {
     const input = screen.getByPlaceholderText(/Ingresa las palabras/i)
     const btn   = screen.getByRole('button', { name: /buscar/i })
 
-    await userEvent.type(input, 'derecho')
+    await userEvent.type(input, 'handbook')
     await userEvent.click(btn)
     await screen.findByText(/Document 123/)
     expect(screen.getByText(/Score:/)).toBeInTheDocument()

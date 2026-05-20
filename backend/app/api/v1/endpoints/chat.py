@@ -79,8 +79,7 @@ emit_msg_tool = {
   }
 }
 
-tools = [
-    emit_msg_tool,
+retrieval_tools = [
     {
         "type": "function",
         "name": "search_documents",
@@ -132,6 +131,8 @@ tools = [
         }
     }
 ]
+
+tools = [emit_msg_tool, *retrieval_tools] if settings.TOOL_RETRIEVAL else [emit_msg_tool]
 
 def sanitize_output_items(raw_items):
     """Convert SDK output items to API-acceptable input items."""

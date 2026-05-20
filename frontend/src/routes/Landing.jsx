@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 // import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { APP_NAME } from '../config/appConfig';
 
 export default function Landing() {
   const { session } = useAuth();
@@ -17,7 +18,7 @@ export default function Landing() {
         className="flex items-end"
       >
         <h1 className="text-6xl md:text-6xl font-semibold tracking-tight">
-          {user && firstName ? `Hola, ${firstName}` : 'Agentic RAG Template'}
+          {user && firstName ? `Hola, ${firstName}` : APP_NAME}
         </h1>
       </div>
 

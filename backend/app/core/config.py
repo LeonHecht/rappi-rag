@@ -37,13 +37,10 @@ class Settings(BaseSettings):
     TOOL_SQL: bool = tool_config.get("sql", False)
     TOOL_CHARTS: bool = tool_config.get("charts", False)
 
-    CORPUS_PATH: str = "./data/static_corpus"
-    SEARCH_BACKEND: str = "bm25"
-
     APP_ENV: str = "local"
     API_VERSION: str = "v1"
     PORT: int = 8000
-    ALLOWED_ORIGINS: str ="http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:5173"
     CORPUS_PATH: str = "data/static_corpus"
     DATA_UPLOAD: str = "backend/app/api/data/user_uploads"
 

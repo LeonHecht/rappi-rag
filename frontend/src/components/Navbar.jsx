@@ -1,8 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-
-const APP_NAME = 'Agentic RAG Template';
+import { APP_NAME } from '../config/appConfig';
 
 export default function Navbar() {
   const { session } = useAuth();

@@ -4,6 +4,9 @@ import App from './App';
 import './index.css';
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { APP_NAME } from "./config/appConfig";
+
+document.title = APP_NAME;
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

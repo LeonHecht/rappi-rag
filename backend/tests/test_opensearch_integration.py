@@ -1,21 +1,21 @@
-# backend/tests/test_opensearch_integration.py
 from opensearchpy import OpenSearch
 import pytest
 
+
 @pytest.mark.opensearch
 def test_search_with_ephemeral(os_ephemeral_index):
-    c = OpenSearch([{"host":"localhost","port":9200}], http_compress=True, verify_certs=False)
-    idx = os_ephemeral_index
+    client = OpenSearch([{"host": "localhost", "port": 9200}], http_compress=True, verify_certs=False)
+    index_name = os_ephemeral_index
 
     docs = [
-        {"id":"1","title":"Sentencia penal","text":"Sala de lo Penal resolvió..."},
-        {"id":"2","title":"Habeas corpus","text":"Sala de lo Constitucional improcedente..."},
+        {"id": "1", "title": "Product Handbook", "text": "The product handbook explains grounded answers."},
+        {"id": "2", "title": "Support Policy", "text": "The support policy defines priority levels."},
     ]
-    for d in docs:
-        c.index(index=idx, id=d["id"], body=d)  # ES7 style: body=
-    c.indices.refresh(index=idx)
+    for doc in docs:
+        client.index(index=index_name, id=doc["id"], body=doc)
+    client.indices.refresh(index=index_name)
 
-    res = c.search(index=idx, body={
-        "query": {"multi_match": {"query": "Sala de lo Penal", "fields": ["title^2","text"], "operator": "and"}}
+    res = client.search(index=index_name, body={
+        "query": {"multi_match": {"query": "product handbook", "fields": ["title^2", "text"], "operator": "and"}}
     })
     assert res["hits"]["hits"]

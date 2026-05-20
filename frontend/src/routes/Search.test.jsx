@@ -37,7 +37,7 @@ it('loads spaces, performs search, and renders results', async () => {
 
   // Type a query and trigger search
   const input = screen.getByPlaceholderText(/Ingresa las palabras/i);
-  await userEvent.type(input, 'contrato');
+  await userEvent.type(input, 'handbook');
   const button = screen.getByRole('button', { name: 'Buscar' });
   await userEvent.click(button);
 
@@ -47,6 +47,6 @@ it('loads spaces, performs search, and renders results', async () => {
 
   // Ensure useApi called for spaces and search
   expect(apiMock).toHaveBeenCalledWith('user/spaces');
-  expect(apiMock).toHaveBeenCalledWith('search', expect.stringMatching(/\?q=contrato/));
+  expect(apiMock).toHaveBeenCalledWith('search', expect.stringMatching(/\?q=handbook/));
 });
 

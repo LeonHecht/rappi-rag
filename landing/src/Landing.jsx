@@ -1,5 +1,6 @@
 import Navbar from './components/Navbar';
 import ChatBox from './components/ChatBox';
+import { APP_NAME } from './config/appConfig';
 
 export default function Landing() {
   return (
@@ -10,7 +11,7 @@ export default function Landing() {
         <section className="flex-1 flex flex-col items-center justify-center">
           <div className="flex flex-col gap-5 max-w-2xl w-full">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-center">
-              Agentic RAG Template
+              {APP_NAME}
             </h1>
 
             <div className="space-y-20">

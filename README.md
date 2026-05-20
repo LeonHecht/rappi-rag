@@ -42,6 +42,14 @@ git clone <your-fork-or-origin-url>
 cd agentic-rag-template
 ```
 
+Copy example env files and fill in provider keys only for the integrations you use:
+
+```bash
+cp backend/.env.example .env
+cp frontend/.env.example frontend/.env
+cp landing/.env.example landing/.env
+```
+
 ### 1. Backend
 
 Create and activate a Python virtualenv (Python 3.10+ recommended), then install dependencies:
@@ -51,16 +59,10 @@ cd backend
 pip install -r requirements.txt
 ```
 
-Set up your environment:
-
-```bash
-cp ../env.staging .env   # or create .env manually
-```
-
 Run the API with Uvicorn:
 
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+.venv/bin/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 2. Frontend App
