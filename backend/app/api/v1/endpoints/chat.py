@@ -7,6 +7,7 @@ import re
 import json
 import textwrap
 import os
+from pathlib import Path
 from openai import OpenAI
 from backend.app.core.config import settings
 from backend.app.services.search import search_engine
@@ -47,6 +48,8 @@ class AgenticChatRequest(BaseModel):
 router = APIRouter()
 # Lazy OpenAI client initialization to avoid startup failures when OPENAI_API_KEY is missing
 client: OpenAI | None = None
+PROMPTS_DIR = Path(__file__).resolve().parents[3] / "prompts"
+SYSTEM_PROMPT = (PROMPTS_DIR / "system_prompt.md").read_text(encoding="utf-8").strip()
 
 def get_openai_client() -> OpenAI | None:
     """Return a cached OpenAI client if OPENAI_API_KEY is configured, else None."""
@@ -61,60 +64,6 @@ def get_openai_client() -> OpenAI | None:
         return client
     except Exception:
         return None
-
-FAST_SYS_PROMPT = """You are a helpful legal assistant for LATAM. Default to the user's language."""
-
-SYSTEM_PROMPT_V1 = """
-You are a precise, citation-driven legal assistant.
-Default to the user’s language. If the user writes in Spanish, answer in Spanish.
-Note: The Chat's logic is based on so called "Spaces" that the user can select. This space contains a collection of documents that will be searchable via the tools.
-The Space can be public legal cases from El Salvador or the user's personal uploaded documents.
-So when the user asks for information, that cannot be answered with public knowledge, assume the user wants you to search the selected Space.
-When the user asks you to search in his/her documents, assume they refer to the selected Space.
-
-## When to use tools
-- Use tools for claims that depend on specific sources from the corpus (cases, statutes, Diario Oficial, internal documents).
-- For general legal concepts, definitions, or procedural instructions that do not require a citation, answer directly without using tools.
-
-## Planning loop
-0. If the user's message can be answered directly without searching the corpus, skip the planning loop and answer directly. Else:
-1. Rephrase the user's goal clearly, concisely, and in a friendly manner and emit a message informing the user via `emit_event`.
-2. If necessary, decompose the user's query into sub-queries. For each sub-query:
-- Brief internally on how to solve the sub-query.
-- Emit a single function call to `emit_event` with an elaborated plan in a user-friendly language (2–6 bullet points).
-- If corpus content is needed, call `search_cases` with a keyword-based query (for the BM25 retriever).
-- Select 5–10 promising document IDs and call `fetch_passages` for 2–3 passages per document.
-- Respond with bracketed citations after every factual claim based on retrieved text.
-- If the user asks for a summary of a specific case, call `fetch_document` instead of `fetch_passages`.
-- When you gathered all necessary information to provide the final answer back to the user. Do not include the user intent in your response, just respond naturally as if it was a normal conversation.
-- If at any point you need clarification or a selection from the user, respond with a clear prompt, so after getting back the clarification from the user, you can proceed with the reasoning. But try to assume the most likely intent of the user and avoid asking for clarifications unless absolutely necessary.
-
-## Citations
-- Include bracketed citations: [DocID §citation] after any factual assertion based on a specific document. The citation you include can be 1-3 sentences or shorter, depending on the situation.
-- If multiple documents support the same claim, GROUP them in a single bracket like: [38949; 38950] or [38949 §nota; 38950]. Do not emit adjacent brackets like [38949] [38950].
-- Cite only documents actually reviewed through `fetch_passages` or `fetch_document`.
-
-## Output Format
-- ALWAYS PROVIDE YOUR ANSWER IN MARKDOWN!
-
-## Quality & Safety
-- Be concise, concrete, and neutral. 
-- Do not provide legal advice disclaimers unless explicitly requested.
-- Avoid definitive prescriptions (“debes”); maintain an informative tone.
-- If sourced information is insufficient or ambiguous, state this clearly and suggest a refined search.
-- Remember, you only have access to the local database containing legal documents from El Salvador and Paraguay, don't propose to the user to search any external databases or the internet (not possible).
-
-## Examples of Query Routing
-- “¿Qué es hábeas corpus?” → Answer directly (no tools).
-- “Resume 5 casos de robo de 2014” → Search → select IDs → fetch passages → summarize 3–5 cases → ask if the user wishes to continue.
-- “Dame jurisprudencia similar a X” → Search using quoted terms/entities → fetch → compare and summarize findings.
-"""
-
-# TEST_SYS_PROMPT = """
-# You are a legal assistant. Answer in the language of the user.
-# Operational rule: First, emit a single function call to `report_trace` with a brief plan (2–6 bullets),
-# then proceed to call tools as needed. Keep the plan concise and non-sensitive.
-# """
 
 emit_msg_tool = {
   "type": "function",
@@ -454,7 +403,7 @@ async def chat_agentic_stream(req: AgenticChatRequest):
     # print(f"openai_messages: {openai_messages}")
 
     ctx = AgentContext(space=req.space, openai_messages=openai_messages, last_user_msg=last_user_msg)
-    cfg = AgentConfig(model=settings.OPENAI_CHAT_MODEL, system_prompt=SYSTEM_PROMPT_V1, tools=tools)
+    cfg = AgentConfig(model=settings.OPENAI_CHAT_MODEL, system_prompt=SYSTEM_PROMPT, tools=tools)
 
     # final_answer = ""
     # citations: list[dict[str, str]] = []
@@ -477,46 +426,6 @@ async def chat_agentic_stream(req: AgenticChatRequest):
             yield f"event: {event}\n".encode("utf-8")
             yield f"data: {json.dumps(obj, ensure_ascii=False)}\n\n".encode("utf-8")
 
-        # if is_respond_fast(last_user_msg):
-        #     stream = client.responses.create(
-        #         model="gpt-4.1-mini",
-        #         instructions=FAST_SYS_PROMPT,
-        #         input=ctx.openai_messages,
-        #         stream=True,
-        #     )
-
-        #     # Local accumulator for this streamed turn
-        #     acc_text: list[str] = []
-
-        #     for ev in stream:
-        #         t = getattr(ev, "type", None)
-
-        #         # Output text
-        #         if t == "response.output_text.delta":
-        #             d = getattr(ev, "delta", "") or ""
-        #             acc_text.append(d)
-        #             await asyncio.sleep(0)  # optional, helps flush
-        #             async for chunk in emit("response.output_text.delta", {"step": ctx.iteration_count, "delta": d}):
-        #                 yield chunk
-        #         if t == "response.output_text.done":
-        #             txt = getattr(ev, "text", "") or ""
-        #             ctx.final_answer = txt or "".join(acc_text)
-        #             await asyncio.sleep(0)  # optional, helps flush
-        #             async for chunk in emit("response.output_text.done", {"step": ctx.iteration_count, "text": ctx.final_answer}):
-        #                 yield chunk
-
-        #             if ctx.final_answer:
-        #                 ctx.openai_messages.append({
-        #                     "role": "assistant",
-        #                     "content": ctx.final_answer
-        #                 })
-        #             ctx.keep_reasoning = False
-
-        #         # Completion
-        #         if t == "response.completed":
-        #             pass
-
-        #     stream.close()
 
         while ctx.keep_reasoning and ctx.iteration_count < cfg.max_iterations:
             ctx.iteration_count += 1
