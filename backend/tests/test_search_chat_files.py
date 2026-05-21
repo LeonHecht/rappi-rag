@@ -236,6 +236,34 @@ def test_stream_emits_progress_before_tool_execution(monkeypatch):
     assert body.index("Voy a consultar los datos") < body.index("Listo")
 
 
+def test_stream_returns_executive_report_directly(monkeypatch):
+    monkeypatch.setattr(
+        chat_ep.analytics,
+        "generate_executive_report",
+        lambda: "# Executive Analytics Report\n\n## Executive Summary\n- Critical finding.",
+    )
+
+    async def collect_stream():
+        req = chat_ep.AgenticChatRequest(
+            space="personal",
+            messages=[{"role": "user", "content": "Give me the executive report for the data"}],
+        )
+        response = await chat_ep.chat_agentic_stream(req)
+        chunks = []
+        async for chunk in response.body_iterator:
+            chunks.append(chunk.decode("utf-8"))
+        return "".join(chunks)
+
+    body = asyncio.run(collect_stream())
+
+    assert "event: response.emit_message" in body
+    assert "Generando un reporte ejecutivo" in body
+    assert "event: response.output_text.delta" in body
+    assert "# Executive Analytics Report" in body
+    assert "## Executive Summary" in body
+    assert "generate_executive_report" in body
+
+
 def test_stream_converts_plain_emit_event_json_to_progress(monkeypatch):
     class FakeStream:
         def __init__(self, events):
