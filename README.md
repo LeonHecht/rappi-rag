@@ -63,6 +63,20 @@ In demo mode:
 
 The frontend also falls back to demo mode automatically when Supabase frontend env vars are blank, but `npm run dev -- --mode demo` is the clearest command for reviewers.
 
+## How to use the SQL Analytics Feature
+
+1) Go to tab "Subir".
+2) Under "Elige espacio" select "personal".
+3) Click "eligir archivos".
+4) Upload the *xlsx file (Sistema de Análisis Inteligente para Operaciones Rappi - Dummy Data (2) (1) (3) (1) (1) (1) (1) (1).xlsx).
+5) Then switch back to "Chat" Tab and ask any analytical question, for example:
+- Preguntas de filtrado: "¿Cuáles son las 5 zonas con mayor % Lead Penetration esta semana?" 
+- Comparaciones: "Compara el Perfect Order entre zonas Wealthy y Non Wealthy en México" 
+- Tendencias temporales: "Muestra la evolución de Gross Profit UE en Chapinero últimas 8 semanas" 
+- Agregaciones: "¿Cuál es el promedio de Lead Penetration por país?"
+- Análisis multivariable: "¿Qué zonas tienen alto Lead Penetration pero bajo Perfect Order?" 
+- Preguntas de inferencia: ¿ cuáles son las zonas que más crecen en órdenes en las últimas 5 semanas y que podría explicar el crecimiento? 
+
 ## Recommended Demo Env
 
 Backend demo env lives in `backend/.env.demo`. Copy it to repo-root `.env` because the backend settings loader reads `.env` from the current working directory when launched from the repo root.
