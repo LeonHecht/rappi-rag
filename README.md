@@ -3,6 +3,7 @@
 Full-stack retrieval-augmented generation app for local document search, uploads, and agentic chat. This repo is configured for an interview/demo hand-in: reviewers can run it locally with only an OpenAI API key.
 
 The production-oriented integrations are still present, but optional. Supabase, Stripe, OpenSearch, S3, and hosted infrastructure are not required for the local demo path.
+There is a corpus.jsonl in the data/ directory with sample documents. For this review, the corpus.jsonl can be ignored, since the .xlsx file has to be uploaded manually. 
 
 ## Quickstart: Local Demo
 
