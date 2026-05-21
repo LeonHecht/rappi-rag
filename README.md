@@ -56,7 +56,7 @@ In demo mode:
 
 - Auth is disabled and the backend returns a fixed local user, `demo@example.com`.
 - Search uses local BM25 over `data/static_corpus/corpus.jsonl`.
-- Uploads are stored on the local filesystem.
+- Uploads are stored on the local filesystem. You can upload CSV files directly, or one `.xlsx` workbook whose worksheets are converted into separate CSV files internally.
 - Chat history is stored in browser `localStorage`.
 - Billing/Stripe flows are disabled.
 - Supabase, OpenSearch, S3, and Stripe env vars can stay blank.
@@ -145,6 +145,13 @@ Auth is selected by demo flags:
 - Demo disabled: the backend verifies Supabase JWTs and uses Supabase-backed user/space data.
 
 The frontend is a Vite React app. In demo mode, it skips login, omits Authorization headers, and stores chat sidebar/history data in `localStorage`. When Supabase env vars are provided and demo mode is off, the original Supabase auth/database flow is used.
+
+Upload behavior:
+
+- Multiple `.csv` files can be uploaded together.
+- One `.xlsx` or `.xlsm` workbook can be uploaded at a time.
+- Each worksheet in the workbook is saved as a separate generated `.csv` file in the selected space.
+- Generated CSVs are passed through the same DuckDB analytics loader as direct CSV uploads.
 
 ## Testing
 

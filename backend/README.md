@@ -149,6 +149,8 @@ The loader writes long-form tables into DuckDB:
 
 CSV files uploaded through `/upload` are saved as before; recognized analytics CSVs are also appended to the configured DuckDB database.
 
+The upload endpoint also accepts one `.xlsx` or `.xlsm` workbook at a time. Each worksheet is converted to a separate generated `.csv` file in the selected upload space, then each generated CSV is passed through the same analytics loader. Upload either multiple CSV files or one Excel workbook; mixing Excel with other files in one request is rejected.
+
 To load a local directory manually:
 
 ```bash

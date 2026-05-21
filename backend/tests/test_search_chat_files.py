@@ -1,5 +1,6 @@
 from pathlib import Path
 import io
+import pandas as pd
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -9,6 +10,7 @@ from types import SimpleNamespace
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
 
 import pytest
+from fastapi import HTTPException
 
 from backend.app.core.config import settings
 from backend.app.api.v1.endpoints import search as search_ep
@@ -117,6 +119,63 @@ def test_file_upload_creates_file_and_indexes(test_env, monkeypatch):
     path = Path(settings.DATA_UPLOAD) / "alice" / "personal" / saved
     assert path.exists()
     assert indexed == ["alice/personal"]
+
+
+def test_xlsx_upload_converts_each_sheet_to_csv(test_env, monkeypatch):
+    user = test_env
+    workbook = io.BytesIO()
+    with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
+        pd.DataFrame({
+            "COUNTRY": ["MX"],
+            "CITY": ["CDMX"],
+            "ZONE": ["Roma"],
+            "METRIC": ["Orders"],
+            "L0W": [10],
+        }).to_excel(writer, sheet_name="Orders", index=False)
+        pd.DataFrame({
+            "COUNTRY": ["MX"],
+            "CITY": ["CDMX"],
+            "ZONE": ["Roma"],
+            "ZONE_TYPE": ["Core"],
+            "ZONE_PRIORITIZATION": ["High"],
+            "METRIC": ["Lead Penetration"],
+            "L0W_VALUE": [0.4],
+        }).to_excel(writer, sheet_name="Metrics", index=False)
+    workbook.seek(0)
+
+    loaded_paths = []
+    indexed = []
+
+    def fake_load_csv(path):
+        loaded_paths.append(Path(path))
+        return {"loaded": True, "rows": 1}
+
+    monkeypatch.setattr(files_ep, "load_csv_to_duckdb", fake_load_csv)
+    monkeypatch.setattr(search_engine, "index", lambda space: indexed.append(space))
+
+    uploaded = UploadFile(filename="analytics.xlsx", file=workbook)
+    resp = asyncio.run(files_ep.upload_file(files=[uploaded], space="alice/personal", user=user))
+
+    assert resp["uploaded"][0]["filename"] == "analytics.xlsx"
+    assert len(resp["converted"]) == 2
+    assert {item["sheet"] for item in resp["converted"]} == {"Orders", "Metrics"}
+    assert all((Path(settings.DATA_UPLOAD) / "alice" / "personal" / item["saved_path"]).exists() for item in resp["converted"])
+    assert len(loaded_paths) == 2
+    assert all(path.suffix == ".csv" for path in loaded_paths)
+    assert {item["source_workbook"] for item in resp["analytics"]} == {"analytics.xlsx"}
+    assert indexed == ["alice/personal"]
+
+
+def test_xlsx_upload_cannot_be_mixed_with_other_files(test_env):
+    user = test_env
+    workbook = UploadFile(filename="analytics.xlsx", file=io.BytesIO(b"not-used"))
+    csv_file = UploadFile(filename="orders.csv", file=io.BytesIO(b"COUNTRY,CITY,ZONE,METRIC,L0W\nMX,CDMX,Roma,Orders,1\n"))
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(files_ep.upload_file(files=[workbook, csv_file], space="alice/personal", user=user))
+
+    assert exc.value.status_code == 400
+    assert "either CSV files or one Excel workbook" in exc.value.detail
 
 
 def test_stream_emits_progress_before_tool_execution(monkeypatch):
