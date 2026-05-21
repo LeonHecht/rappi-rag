@@ -44,6 +44,11 @@ pip-log.txt
 # ────────── Backend specific ────────────────────────────────────────────────
 # SQLite DBs, migrations (if you want to regenerate)
 *.db
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+data/analytics/*.duckdb
+data/analytics/*.duckdb.*
 backend/app/db/migrations/
 backend/app/api/data/user_uploads/*
 
