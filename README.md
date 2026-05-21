@@ -79,7 +79,7 @@ The frontend also falls back to demo mode automatically when Supabase frontend e
 - Análisis multivariable: "¿Qué zonas tienen alto Lead Penetration pero bajo Perfect Order?" 
 - Preguntas de inferencia: ¿ cuáles son las zonas que más crecen en órdenes en las últimas 5 semanas y que podría explicar el crecimiento? 
 
-## Part 2: How to get the Analytics Report?
+## Part 2: How to get the Analytics Report
 
 Just prompt the chat something like: "Give me the analytics report for the uploaded data." And it is going to return the report in markdown format directly in the chat.
 
