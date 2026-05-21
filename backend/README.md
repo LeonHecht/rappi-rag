@@ -4,6 +4,46 @@ FastAPI backend for the Agentic RAG Template. It serves search, file upload, aut
 
 ## Local Quickstart
 
+### Demo mode: no Supabase required
+
+Use this path for a local interview demo. It requires only `OPENAI_API_KEY` for agentic chat; search and uploads work with local BM25 and local files.
+
+From the repo root:
+
+```bash
+cp backend/.env.demo .env
+# edit .env and set OPENAI_API_KEY=sk-...
+
+python3 -m venv .venv
+.venv/bin/python -m pip install -r backend/requirements.txt
+.venv/bin/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Expected local demo settings:
+
+```env
+DEMO_MODE=true
+AUTH_DISABLED=true
+SEARCH_BACKEND=bm25
+CORPUS_PATH=data/static_corpus
+SUPABASE_URL=
+SUPABASE_SECRET_KEY=
+STRIPE_SECRET_KEY=
+S3_BUCKET=
+```
+
+Start the frontend in a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev -- --mode demo
+```
+
+Demo mode returns a fixed user (`demo@example.com`) from `get_current_user`, exposes the default corpus space plus `demo@example.com/personal`, and keeps Supabase/Stripe code present but inactive.
+
+### Standard local setup
+
 Create a virtualenv from the repo root and install dependencies:
 
 ```bash

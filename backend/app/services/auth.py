@@ -40,6 +40,10 @@ def get_supabase() -> Client:
 
 PUBLIC_SPACES = [settings.DEFAULT_SPACE]
 
+
+def is_demo_mode() -> bool:
+    return bool(settings.DEMO_MODE or settings.AUTH_DISABLED)
+
 @dataclass
 class UserData:
     """Represents the authenticated user context derived from Supabase.
@@ -57,6 +61,18 @@ class UserData:
     last_name: str = ""
     spaces: List[str] = field(default_factory=list)
     organization: Optional[str] = None
+
+
+def get_demo_user() -> UserData:
+    """Return the fixed local user used when demo auth is enabled."""
+    return UserData(
+        user_id=settings.DEMO_USER_ID,
+        username=settings.DEMO_USER_EMAIL,
+        first_name="Demo",
+        last_name="User",
+        spaces=[settings.DEMO_PERSONAL_SPACE],
+        organization=None,
+    )
 
 
 def get_or_create_user_from_supabase(user_id: str, email: str, user_metadata: Optional[dict] = None) -> UserData:
@@ -141,6 +157,18 @@ def get_accessible_spaces(user: UserData) -> List[str]:
         - Personal spaces: "<email>/<space_name>"
         - Org spaces: "<org_id>/<space_name>" (can later be swapped to org name)
     """
+    if is_demo_mode():
+        personal_key = f"{user.username}/{settings.DEMO_PERSONAL_SPACE}"
+        upload_root = Path(settings.DATA_UPLOAD)
+        discovered: List[str] = []
+        if upload_root.exists():
+            user_dir = upload_root / user.username
+            if user_dir.exists():
+                discovered.extend(
+                    f"{user.username}/{p.name}" for p in user_dir.iterdir() if p.is_dir()
+                )
+        return list(dict.fromkeys(PUBLIC_SPACES + [personal_key] + discovered))
+
     try:
         sb = get_supabase()
         # Personal spaces owned by the user
@@ -172,6 +200,14 @@ def create_user_space(user: UserData, name: str) -> str:
     """
     if any(token in name for token in ("..", "/", "\\")):
         raise ValueError("Invalid space name")
+    if is_demo_mode():
+        uploads_root = Path(settings.DATA_UPLOAD) / user.username
+        space_dir = uploads_root / name
+        space_dir.mkdir(parents=True, exist_ok=True)
+        if name not in user.spaces:
+            user.spaces.append(name)
+        return f"{user.username}/{name}"
+
     try:
         sb = get_supabase()
         # Insert space row (id auto-generated). Avoid duplicates.

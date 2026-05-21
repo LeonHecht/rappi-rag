@@ -119,3 +119,8 @@ def get_billing_status(user: UserData = Depends(get_current_user)):
         # On error, don't block UI; degrade gracefully
         print(f"get_billing_status error: {e}")
         return {"subscription_tier": "free", "provider": "stripe"}
+    if settings.DEMO_MODE or settings.AUTH_DISABLED:
+        raise HTTPException(status_code=404, detail="Billing is disabled in demo mode")
+
+    if settings.DEMO_MODE or settings.AUTH_DISABLED:
+        return {"subscription_tier": "demo", "provider": None}

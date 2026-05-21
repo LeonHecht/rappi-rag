@@ -7,6 +7,7 @@ import pytest
 from backend.app.core.config import settings
 from backend.app.core import security
 import backend.app.services.auth as auth
+from backend.app.dependencies import get_current_user
 
 
 @pytest.fixture()
@@ -288,4 +289,34 @@ def test_create_user_space_invalid(auth_env):
         auth.create_user_space(user, "bad/name")
     with pytest.raises(ValueError, match="Invalid space name"):
         auth.create_user_space(user, "bad\\name")
+
+
+def test_demo_mode_current_user_without_credentials(monkeypatch):
+    monkeypatch.setattr(settings, "DEMO_MODE", True)
+    monkeypatch.setattr(settings, "AUTH_DISABLED", False)
+    monkeypatch.setattr(settings, "DEMO_USER_EMAIL", "demo@example.com")
+
+    user = get_current_user(None)
+
+    assert user.user_id == settings.DEMO_USER_ID
+    assert user.username == "demo@example.com"
+    assert user.first_name == "Demo"
+
+
+def test_demo_mode_spaces_and_create_space_without_supabase(auth_env, monkeypatch):
+    monkeypatch.setattr(settings, "DEMO_MODE", True)
+    monkeypatch.setattr(settings, "AUTH_DISABLED", False)
+    monkeypatch.setattr(settings, "DEMO_USER_EMAIL", "demo@example.com")
+    monkeypatch.setattr(settings, "DEMO_PERSONAL_SPACE", "personal")
+
+    user = auth.get_demo_user()
+    spaces = auth.get_accessible_spaces(user)
+
+    assert settings.DEFAULT_SPACE in spaces
+    assert "demo@example.com/personal" in spaces
+
+    created = auth.create_user_space(user, "interview")
+    assert created == "demo@example.com/interview"
+    assert (Path(settings.DATA_UPLOAD) / "demo@example.com" / "interview").is_dir()
+    assert created in auth.get_accessible_spaces(user)
     

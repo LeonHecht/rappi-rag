@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import SignUpForm from "@/components/SignUpForm";
 import SignInForm from "@/components/SignInForm";
+import { isDemoMode } from "@/lib/demoMode";
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -14,10 +15,12 @@ export default function AuthPage() {
 
   useEffect(() => {
     // Redirect to home if user is already authenticated
-    if (session) {
+    if (session || isDemoMode) {
       navigate("/");
     }
   }, [session, navigate]);
+
+  if (isDemoMode) return null;
 
   return (
     <div className="flex justify-center items-center h-screen bg-gray-50">

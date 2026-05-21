@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { isDemoMode, demoUser } from './demoMode'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabasePublishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
@@ -6,10 +7,17 @@ const supabasePublishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
 
 // In test mode, provide a minimal no-op client if env vars are not set,
 // so unit tests that forget to mock don't crash the test collector.
-function makeTestClient(): SupabaseClient {
+function makeNoopClient(): SupabaseClient {
   return {
     auth: {
-      getSession: async () => ({ data: { session: null }, error: null }),
+      getSession: async () => ({
+        data: { session: isDemoMode ? { user: demoUser, access_token: null } : null },
+        error: null,
+      }),
+      getUser: async () => ({
+        data: { user: isDemoMode ? demoUser : null },
+        error: null,
+      }),
       onAuthStateChange: () => ({
         data: {
           subscription: {
@@ -22,6 +30,9 @@ function makeTestClient(): SupabaseClient {
       }),
       signOut: async () => ({ error: null }),
     },
+    from: () => {
+      throw new Error('Supabase is not configured.')
+    },
   } as unknown as SupabaseClient
 }
 
@@ -33,8 +44,8 @@ const isTest =
 export const supabase: SupabaseClient =
   supabaseUrl && supabasePublishableKey
     ? createClient(supabaseUrl, supabasePublishableKey)
-    : isTest
-    ? makeTestClient()
+    : isTest || isDemoMode
+    ? makeNoopClient()
     : (() => {
         throw new Error('supabaseUrl is required.')
       })()

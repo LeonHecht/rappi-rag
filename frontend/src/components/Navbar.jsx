@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { APP_NAME } from '../config/appConfig';
+import { isDemoMode } from '../lib/demoMode';
 
 export default function Navbar() {
   const { session } = useAuth();
@@ -54,6 +55,7 @@ export default function Navbar() {
     let active = true;
     async function fetchTier() {
       if (!user) return setTier("free");
+      if (isDemoMode) return setTier("demo");
       try {
         const mod = await import('../hooks/useApi.jsx');
         const fetcher = mod.apiFetch || mod.default || mod.useApi;
@@ -72,10 +74,10 @@ export default function Navbar() {
     try {
       try { localStorage.removeItem('auth'); } catch { /* noop */ }
       const { supabase } = await import('../lib/supabaseClient');
-      await supabase.auth.signOut();
+      if (!isDemoMode) await supabase.auth.signOut();
     } catch { /* noop */ }
     setOpen(false);
-    navigate('/login');
+    navigate(isDemoMode ? '/' : '/login');
   }
 
   return (
@@ -127,21 +129,23 @@ export default function Navbar() {
                     </div>
                   </div>
                   <div className="py-1">
-                    <button
-                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
-                      onClick={handleLogout}
-                    >
-                      Cerrar sesion
-                    </button>
+                    {!isDemoMode && (
+                      <button
+                        className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
+                        onClick={handleLogout}
+                      >
+                        Cerrar sesion
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
             </div>
-          ) : (
+          ) : !isDemoMode ? (
             <Link to="/login" className="text-gray-600 hover:text-gray-400">
               Login
             </Link>
-          )}
+          ) : null}
         </div>
       </div>
     </nav>
