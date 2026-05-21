@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     ANALYTICS_MAX_ROWS: int = 200
     ANALYTICS_ANOMALY_THRESHOLD: float = 0.10
 
+    # --- Local demo mode ---
+    # When enabled, the backend does not require Supabase bearer tokens and
+    # returns a fixed local user. Production Supabase auth remains the default.
+    DEMO_MODE: bool = False
+    AUTH_DISABLED: bool = False
+    DEMO_USER_ID: str = "demo-user"
+    DEMO_USER_EMAIL: str = "demo@example.com"
+    DEMO_PERSONAL_SPACE: str = "personal"
+
     # Search backend configuration
     SEARCH_BACKEND: str = domain_config.get("retrieval_backend", "opensearch")  # bm25 | opensearch
     OPENSEARCH_HOSTS: str = "http://localhost:9200"

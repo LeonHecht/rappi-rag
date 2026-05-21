@@ -1,5 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  createDemoChat,
+  deleteDemoChat,
+  isDemoMode,
+  listDemoChats,
+  updateDemoChat,
+} from "@/lib/demoMode";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoreVertical } from "lucide-react";
@@ -66,6 +73,11 @@ export default function ChatSidebar({
 
   const fetchChats = useCallback(async () => {
     setLoading(true);
+    if (isDemoMode) {
+      setChats(listDemoChats());
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("chats")
       .select("id,title,created_at,updated_at")
@@ -118,6 +130,7 @@ export default function ChatSidebar({
   useEffect(() => {
     let channel: any;
     (async () => {
+      if (isDemoMode) return;
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -171,6 +184,13 @@ export default function ChatSidebar({
   }, []);
 
   const createChat = useCallback(async () => {
+    if (isDemoMode) {
+      const chat = createDemoChat();
+      setChats((prev) => [chat, ...prev]);
+      onCreated?.(chat.id);
+      onSelect(chat.id);
+      return;
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -201,6 +221,20 @@ export default function ChatSidebar({
   const saveRename = async () => {
     if (!renameTarget) return;
     const newTitle = renameValue.trim() || "Sin título";
+    if (isDemoMode) {
+      updateDemoChat(renameTarget.id, { title: newTitle });
+      setChats((prev) =>
+        prev.map((c) => (c.id === renameTarget.id ? { ...c, title: newTitle } : c))
+      );
+      try {
+        window.dispatchEvent(
+          new CustomEvent("chat:updated", { detail: { id: renameTarget.id, title: newTitle } })
+        );
+      } catch {}
+      setRenameOpen(false);
+      setRenameTarget(null);
+      return;
+    }
     const { error } = await supabase
       .from("chats")
       .update({ title: newTitle })
@@ -227,6 +261,13 @@ export default function ChatSidebar({
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
+    if (isDemoMode) {
+      deleteDemoChat(id);
+      setChats((prev) => prev.filter((c) => c.id !== id));
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+      return;
+    }
     // Best-effort: delete messages first to avoid FK constraint issues, then the chat
     try {
       await supabase.from("chat_messages").delete().eq("chat_id", id);

@@ -3,6 +3,14 @@ import SpaceSelect from "@/components/SpaceSelect";
 import ChatSidebar from "@/components/ChatSidebar";
 import { apiFetch } from "@/hooks/useApi";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  appendDemoMessage,
+  createDemoChat,
+  getDemoChat,
+  isDemoMode,
+  updateDemoChat,
+  type DemoChatMessage,
+} from "@/lib/demoMode";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar"
 
 // AI Elements
@@ -72,6 +80,7 @@ export default function Chat() {
   const useStreaming: boolean = true;
 
   const token = (() => {
+    if (isDemoMode) return null;
     try {
       const raw = localStorage.getItem("auth");
       return raw ? (JSON.parse(raw).token as string) : null;
@@ -135,13 +144,19 @@ export default function Chat() {
     text: string,
     citations: ChatMsg["citations"] = []
   ) {
+    const message = { id: `${Date.now()}-${role}-${Math.random().toString(36).slice(2, 8)}`, role, text, citations };
     setMessages((prev) => [
       ...prev,
-      { id: `${Date.now()}-${prev.length}`, role, text, citations },
+      message,
     ]);
+    return message;
   }
 
   const loadChatMessages = useCallback(async (chatId: string) => {
+    if (isDemoMode) {
+      setMessages((getDemoChat(chatId)?.messages || []) as ChatMsg[]);
+      return;
+    }
     const { data, error } = await supabase
       .from("chat_messages")
       .select("id, role, content, meta")
@@ -165,6 +180,10 @@ export default function Chat() {
   }, []);
 
   const loadChatAgentState = useCallback(async (chatId: string) => {
+    if (isDemoMode) {
+      setAgentState(getDemoChat(chatId)?.agent_state || null);
+      return;
+    }
     const { data, error } = await supabase
       .from("chats")
       .select("agent_state")
@@ -189,6 +208,16 @@ export default function Chat() {
 
   async function ensureChat(title: string) {
     if (currentChatId) return currentChatId;
+    if (isDemoMode) {
+      const chat = createDemoChat(title || "Nuevo chat");
+      setCurrentChatId(chat.id);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("chat:created", { detail: { chat } })
+        );
+      } catch {}
+      return chat.id;
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -307,11 +336,15 @@ export default function Chat() {
         const chatId = await ensureChat(trimmed.slice(0, 60));
 
         // user message (UI + persist)
-        pushMessage("user", trimmed);
+        const userMessage = pushMessage("user", trimmed);
         setText("");
-        await supabase.from("chat_messages").insert({
-            chat_id: chatId, role: "user", content: trimmed, meta: null,
-        });
+        if (isDemoMode) {
+            appendDemoMessage(chatId, userMessage as DemoChatMessage);
+        } else {
+            await supabase.from("chat_messages").insert({
+                chat_id: chatId, role: "user", content: trimmed, meta: null,
+            });
+        }
 
         const res = await fetch(`${API_BASE}/v1/chat/agentic`, {
             method: "POST",
@@ -323,29 +356,39 @@ export default function Chat() {
 
         if (data.title) {
             setTitle(data.title);
-            await supabase.from("chats").update({ title: data.title }).eq("id", chatId);
+            if (isDemoMode) updateDemoChat(chatId, { title: data.title });
+            else await supabase.from("chats").update({ title: data.title }).eq("id", chatId);
             try { window.dispatchEvent(new CustomEvent("chat:updated", { detail: { id: chatId, title: data.title } })); } catch {}
         }
         if (data.agent_state) {
             setAgentState(data.agent_state);
-            await supabase.from("chats").update({ agent_state: data.agent_state }).eq("id", chatId);
+            if (isDemoMode) updateDemoChat(chatId, { agent_state: data.agent_state });
+            else await supabase.from("chats").update({ agent_state: data.agent_state }).eq("id", chatId);
         }
 
-        await supabase.from("chat_messages").insert({
-            chat_id: chatId, role: "assistant", content: data.answer || "", meta: { citations: data.citations || [] },
-        });
-        pushMessage("assistant", data.answer || "", data.citations || []);
+        const assistantMessage = pushMessage("assistant", data.answer || "", data.citations || []);
+        if (isDemoMode) {
+            appendDemoMessage(chatId, assistantMessage as DemoChatMessage);
+        } else {
+            await supabase.from("chat_messages").insert({
+                chat_id: chatId, role: "assistant", content: data.answer || "", meta: { citations: data.citations || [] },
+            });
+        }
     }
 
   async function handleSubmitStream(trimmed: string) {
     const chatId = await ensureChat(trimmed.slice(0, 60));
 
     // user message (UI + persist)
-    pushMessage("user", trimmed);
+    const userMessage = pushMessage("user", trimmed);
     setText("");
-    await supabase.from("chat_messages").insert({
-        chat_id: chatId, role: "user", content: trimmed, meta: null,
-    });
+    if (isDemoMode) {
+        appendDemoMessage(chatId, userMessage as DemoChatMessage);
+    } else {
+        await supabase.from("chat_messages").insert({
+            chat_id: chatId, role: "user", content: trimmed, meta: null,
+        });
+    }
 
     // assistant placeholder (we'll stream into it)
     const assistantId = pushAssistantPlaceholder();
@@ -425,17 +468,30 @@ export default function Chat() {
 
             if (title) {
                 setTitle(title);
-                await supabase.from("chats").update({ title }).eq("id", chatId);
+                if (isDemoMode) updateDemoChat(chatId, { title });
+                else await supabase.from("chats").update({ title }).eq("id", chatId);
                 try { window.dispatchEvent(new CustomEvent("chat:updated", { detail: { id: chatId, title } })); } catch {}
             }
             if (newState) {
                 setAgentState(newState);
-                await supabase.from("chats").update({ agent_state: newState }).eq("id", chatId);
+                if (isDemoMode) updateDemoChat(chatId, { agent_state: newState });
+                else await supabase.from("chats").update({ agent_state: newState }).eq("id", chatId);
             }
 
-            await supabase.from("chat_messages").insert({
-                      chat_id: chatId, role: "assistant", content: answer, meta: { citations, reasoning: reasoningBuf },
-            });
+            if (isDemoMode) {
+                appendDemoMessage(chatId, {
+                  id: assistantId,
+                  role: "assistant",
+                  text: answer,
+                  citations,
+                  reasoning: reasoningBuf,
+                  reasoningStreaming: false,
+                });
+            } else {
+                await supabase.from("chat_messages").insert({
+                          chat_id: chatId, role: "assistant", content: answer, meta: { citations, reasoning: reasoningBuf },
+                });
+            }
 
             setStatus("ready");
             // Streaming finished; allow Reasoning to auto-close for this message
@@ -597,7 +653,7 @@ export default function Chat() {
                           )}
                           {m.role === "assistant" && status === "streaming" && (!m.reasoning || m.reasoning.length === 0) && (m.text ?? "") === "" && (
                             <div className="mb-3 text-muted-foreground text-sm">
-                              <Shimmer duration={2} spread={4}>Iniciando…</Shimmer>
+                              <Shimmer duration={2} spread={4}>Pensando…</Shimmer>
                             </div>
                           )}
                           {m.role === "assistant" ? (

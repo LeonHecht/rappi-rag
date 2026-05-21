@@ -1,15 +1,25 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from .services.auth import get_or_create_user_from_supabase, UserData
+from .services.auth import get_demo_user, get_or_create_user_from_supabase, is_demo_mode, UserData
 from .core.security import verify_supabase_token
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> UserData:
+def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> UserData:
     """
     Dependency that extracts and verifies the Supabase JWT token.
     Returns the current user's data from Supabase database.
     """
+    if is_demo_mode():
+        return get_demo_user()
+
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     token = credentials.credentials
     
     try:

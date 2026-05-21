@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabaseClient";
+import { isDemoMode } from "../lib/demoMode";
 
 /**
  * Llama al endpoint de la API en /v1/{path}{params}
@@ -7,8 +8,11 @@ import { supabase } from "../lib/supabaseClient";
  * @returns {Promise<any>}  JSON parseado
  */
 export const apiFetch = async (path, params = "", options = {}) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  let token = null;
+  if (!isDemoMode) {
+    const { data: { session } } = await supabase.auth.getSession();
+    token = session?.access_token;
+  }
   // Normalize to avoid trailing slash that would produce URLs like //v1/...
   const API_BASE = (import.meta.env.VITE_API_BASE || "http://localhost:8000").replace(/\/+$/, "");
 

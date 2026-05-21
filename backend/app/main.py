@@ -53,7 +53,6 @@ def on_startup():
     skip = settings.SKIP_REINDEX_ON_STARTUP
 
     def needs_index(space: str) -> bool:
-        return False
         if force:
             return True
         if skip:
