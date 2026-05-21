@@ -563,6 +563,20 @@ def parse_partial_emit_event_message(arguments: str) -> str | None:
     except Exception:
         return match.group(1).strip()
 
+EXECUTIVE_REPORT_PATTERNS = [
+    re.compile(r"\bexecutive\s+report\b", re.IGNORECASE),
+    re.compile(r"\b(generate|give|create|build|show|prepare)\b.*\b(report|insights?)\b", re.IGNORECASE),
+    re.compile(r"\b(report|insights?)\b.*\b(data|analytics?)\b", re.IGNORECASE),
+    re.compile(r"\breporte\s+ejecutivo\b", re.IGNORECASE),
+    re.compile(r"\b(genera|generar|dame|crear|crea|muestra|prepara)\b.*\b(reporte|informe|insights?|hallazgos)\b", re.IGNORECASE),
+    re.compile(r"\b(reporte|informe|insights?|hallazgos)\b.*\b(datos|anal[ií]tica)\b", re.IGNORECASE),
+]
+
+
+def is_executive_report_request(text: str) -> bool:
+    normalized = (text or "").strip()
+    return any(pattern.search(normalized) for pattern in EXECUTIVE_REPORT_PATTERNS)
+
 import asyncio
 import json
 
@@ -581,6 +595,47 @@ async def chat_agentic_stream(req: AgenticChatRequest):
     last_user_msg = req.messages[-1]['content']
     openai_messages.append({"role": "user", "content": last_user_msg})
     # print(f"openai_messages: {openai_messages}")
+
+    if is_executive_report_request(last_user_msg):
+        async def report_stream():
+            report = analytics.generate_executive_report()
+            title = "Executive Report"
+            yield sse("response.emit_message", {
+                "step": 1,
+                "msg": "Generando un reporte ejecutivo de analítica...",
+            }).encode("utf-8")
+            yield sse("response.output_text.delta", {
+                "step": 1,
+                "delta": report,
+            }).encode("utf-8")
+            yield sse("response.output_text.done", {
+                "step": 1,
+                "text": report,
+            }).encode("utf-8")
+            yield sse("response.completed", {
+                "answer": report,
+                "title": title,
+                "citations": [],
+                "inline_citations": [],
+                "trace_len": 0,
+                "trace": [{
+                    "type": "tool_result",
+                    "step": 1,
+                    "tool": "generate_executive_report",
+                    "result_count": 1,
+                }],
+                "agent_state": json.dumps(openai_messages),
+            }).encode("utf-8")
+
+        return StreamingResponse(
+            report_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     ctx = AgentContext(space=req.space, openai_messages=openai_messages, last_user_msg=last_user_msg)
     cfg = AgentConfig(model=settings.OPENAI_CHAT_MODEL, system_prompt=SYSTEM_PROMPT, tools=tools)

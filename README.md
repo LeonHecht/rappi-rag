@@ -58,6 +58,7 @@ In demo mode:
 - Auth is disabled and the backend returns a fixed local user, `demo@example.com`.
 - Search uses local BM25 over `data/static_corpus/corpus.jsonl`.
 - Uploads are stored on the local filesystem. You can upload CSV files directly, or one `.xlsx` workbook whose worksheets are converted into separate CSV files internally.
+- After uploading analytics data, ask the chat: `Give me the executive report for the data`. The response is generated as Markdown from the loaded DuckDB analytics tables.
 - Chat history is stored in browser `localStorage`.
 - Billing/Stripe flows are disabled.
 - Supabase, OpenSearch, S3, and Stripe env vars can stay blank.
@@ -167,6 +168,13 @@ Upload behavior:
 - One `.xlsx` or `.xlsm` workbook can be uploaded at a time.
 - Each worksheet in the workbook is saved as a separate generated `.csv` file in the selected space.
 - Generated CSVs are passed through the same DuckDB analytics loader as direct CSV uploads.
+
+Executive report behavior:
+
+- Ask the chat for an executive report, for example: `Give me the executive report for the data`.
+- The backend detects that request and returns a deterministic Markdown report from DuckDB.
+- The report includes an executive summary, anomalies, concerning trends, benchmarking, correlations, opportunities, recommendations, and caveats.
+- This path does not require a separate file selector; it analyzes all analytics rows currently loaded into DuckDB.
 
 ## Testing
 

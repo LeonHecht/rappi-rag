@@ -151,6 +151,14 @@ CSV files uploaded through `/upload` are saved as before; recognized analytics C
 
 The upload endpoint also accepts one `.xlsx` or `.xlsm` workbook at a time. Each worksheet is converted to a separate generated `.csv` file in the selected upload space, then each generated CSV is passed through the same analytics loader. Upload either multiple CSV files or one Excel workbook; mixing Excel with other files in one request is rejected.
 
+After CSV/XLSX data is loaded, users can ask the chat for a Markdown executive report, for example:
+
+```text
+Give me the executive report for the data
+```
+
+The chat endpoint detects this request and returns the deterministic DuckDB report from `generate_executive_report()` directly, covering anomalies, trends, benchmarking, correlations, and opportunities across all currently loaded analytics rows.
+
 To load a local directory manually:
 
 ```bash
