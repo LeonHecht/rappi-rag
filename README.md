@@ -65,7 +65,7 @@ In demo mode:
 
 The frontend also falls back to demo mode automatically when Supabase frontend env vars are blank, but `npm run dev -- --mode demo` is the clearest command for reviewers.
 
-## How to use the SQL Analytics Feature
+## Part 1: How to use the SQL Analytics Feature
 
 1) Go to tab "Subir".
 2) Under "Elige espacio" select "personal".
